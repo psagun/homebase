@@ -38,3 +38,5 @@ htmlcov/
 
 .vercel
 .env*
+login_resp.json
+login_response.json
