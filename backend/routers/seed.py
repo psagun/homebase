@@ -4,8 +4,9 @@ import uuid
 from datetime import date
 
 import bcrypt
-from fastapi import APIRouter
+from fastapi import APIRouter, Query
 
+from backend.config import settings
 from backend.database import Base, SessionLocal, engine
 from backend.models.property import Property, PropertyStatus, PropertyType
 from backend.models.user import User
@@ -202,8 +203,11 @@ PROPERTIES = [
 
 
 @router.get("")
-def seed_database():
+def seed_database(key: str = Query(..., description="Seed secret key from CRON_SECRET")):
     """Seed the database with a demo user and sample properties."""
+    if key != settings.cron_secret:
+        return {"status": "error", "message": "Invalid seed key."}
+
     Base.metadata.create_all(bind=engine)
     db = SessionLocal()
 
