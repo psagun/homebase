@@ -3,15 +3,14 @@
 import uuid
 from datetime import date
 
+import bcrypt
 from fastapi import APIRouter
 
-import bcrypt
+from backend.database import Base, SessionLocal, engine
+from backend.models.property import Property, PropertyStatus, PropertyType
+from backend.models.user import User
 
 router = APIRouter()
-
-from backend.database import Base, SessionLocal, engine
-from backend.models.user import User
-from backend.models.property import Property, PropertyStatus, PropertyType
 
 DEMO_EMAIL = "demo@homebase.app"
 DEMO_PASSWORD = "demo1234"
@@ -71,7 +70,7 @@ PROPERTIES = [
         bedrooms=2,
         bathrooms=2,
         year_built=2020,
-        notes="Industrial-chic loft with bay views. Short-term rental averaging $5,200/mo.",
+        notes="Industrial-chic loft with bay views. Short-term rental avg $5,200/mo.",
     ),
     Property(
         name="Green Acres Land",
@@ -125,7 +124,7 @@ PROPERTIES = [
         bedrooms=2,
         bathrooms=1,
         year_built=2000,
-        notes="Under renovation — new HVAC and flooring. Expected to rent for $4,000/mo after completion.",
+        notes="Under renovation — new HVAC and flooring. Expected to rent for $4,000/mo.",
     ),
     Property(
         name="Main Street Retail",
@@ -213,7 +212,7 @@ def seed_database():
         if existing:
             return {
                 "status": "skipped",
-                "message": f"Demo user '{DEMO_EMAIL}' already exists. Database already seeded.",
+                "message": f"Demo user '{DEMO_EMAIL}' already exists.",
                 "demo_email": DEMO_EMAIL,
                 "demo_password": DEMO_PASSWORD,
             }
@@ -238,7 +237,7 @@ def seed_database():
 
         return {
             "status": "ok",
-            "message": f"Created demo user '{DEMO_EMAIL}' with {len(PROPERTIES)} sample properties.",
+            "message": f"Created demo user with {len(PROPERTIES)} sample properties.",
             "demo_email": DEMO_EMAIL,
             "demo_password": DEMO_PASSWORD,
         }
