@@ -2,17 +2,16 @@ services:
   - type: web
     name: homebase-api
     runtime: python
-    repo: https://github.com/sagunp/homebase
-    plan: free
     region: oregon
+    plan: free
     buildCommand: pip install -r requirements.txt
     startCommand: uvicorn backend.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
-        value: postgresql://neondb_owner:npg_dtp4GhgTx8Nr@ep-empty-block-axjtphod-pooler.c-4.us-east-2.aws.neon.tech/neondb?sslmode=require
+        sync: false
       - key: SECRET_KEY
-        value: homebase-render-secret-key-2026
+        sync: false
       - key: CRON_SECRET
-        value: homebase-cron-secret-render-2026
+        sync: false
       - key: ENVIRONMENT
         value: production
