@@ -1,0 +1,138 @@
+import bcrypt
+import os
+import uuid
+from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File, status
+from pydantic import BaseModel, Field
+from sqlalchemy.orm import Session
+
+from backend.config import settings
+from backend.dependencies import get_current_user, get_db
+from backend.models.user import User
+from backend.schemas.auth import (
+    LoginRequest,
+    RefreshRequest,
+    RegisterRequest,
+    TokenResponse,
+    UserResponse,
+)
+from backend.services.auth_service import AuthService
+
+
+class ChangePasswordRequest(BaseModel):
+    current_password: str = Field(..., min_length=1)
+    new_password: str = Field(..., min_length=8, max_length=128)
+
+router = APIRouter()
+
+
+def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
+    return AuthService(db)
+
+
+@router.post("/change-password")
+def change_password(
+    data: ChangePasswordRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Change the authenticated user's password."""
+    if not bcrypt.checkpw(data.current_password.encode("utf-8"), current_user.password_hash.encode("utf-8")):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Current password is incorrect")
+    current_user.password_hash = bcrypt.hashpw(data.new_password.encode("utf-8"), bcrypt.gensalt()).decode("utf-8")
+    db.commit()
+    return {"message": "Password updated successfully"}
+
+
+@router.post("/avatar")
+async def upload_avatar(
+    file: UploadFile = File(...),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Upload a profile picture."""
+    ALLOWED = {"image/png", "image/jpeg", "image/webp", "image/gif"}
+    if file.content_type not in ALLOWED:
+        raise HTTPException(status_code=400, detail="Only PNG, JPEG, WebP, and GIF images are allowed")
+
+    # Ensure uploads dir exists
+    upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads", "avatars")
+    os.makedirs(upload_dir, exist_ok=True)
+
+    # Save file
+    ext = os.path.splitext(file.filename or "avatar.png")[1] or ".png"
+    filename = f"{uuid.uuid4()}{ext}"
+    filepath = os.path.join(upload_dir, filename)
+    content = await file.read()
+    with open(filepath, "wb") as f:
+        f.write(content)
+
+    # Update user
+    avatar_url = f"/uploads/avatars/{filename}"
+    current_user.avatar_url = avatar_url
+    db.commit()
+
+    return {"avatar_url": avatar_url}
+
+
+def _set_token_cookies(response: Response, data: dict) -> dict:
+    """Set auth tokens as HTTP-only cookies on the response."""
+    response.set_cookie(
+        key="access_token",
+        value=data["access_token"],
+        httponly=True,
+        samesite="lax",
+        max_age=settings.access_token_expire_minutes * 60,
+        path="/",
+    )
+    response.set_cookie(
+        key="refresh_token",
+        value=data["refresh_token"],
+        httponly=True,
+        samesite="lax",
+        max_age=settings.refresh_token_expire_days * 86400,
+        path="/api/v1/auth",
+    )
+    return data
+
+
+@router.post("/register", response_model=TokenResponse)
+def register(
+    data: RegisterRequest,
+    response: Response,
+    auth: AuthService = Depends(get_auth_service),
+):
+    result = auth.register(email=data.email, password=data.password, name=data.name)
+    return _set_token_cookies(response, result)
+
+
+@router.post("/login", response_model=TokenResponse)
+def login(
+    data: LoginRequest,
+    response: Response,
+    auth: AuthService = Depends(get_auth_service),
+):
+    result = auth.login(email=data.email, password=data.password)
+    return _set_token_cookies(response, result)
+
+
+@router.post("/refresh", response_model=TokenResponse)
+def refresh(
+    data: RefreshRequest,
+    response: Response,
+    auth: AuthService = Depends(get_auth_service),
+):
+    result = auth.refresh_token(data.refresh_token)
+    return _set_token_cookies(response, result)
+
+
+@router.get("/me", response_model=UserResponse)
+def get_me(current_user: User = Depends(get_current_user)):
+    """Return the currently authenticated user."""
+    return current_user
+
+
+@router.post("/logout")
+def logout(response: Response):
+    response.delete_cookie("access_token", path="/")
+    response.delete_cookie("refresh_token", path="/api/v1/auth")
+    return {"message": "Logged out successfully"}
