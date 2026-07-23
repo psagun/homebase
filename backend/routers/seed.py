@@ -154,7 +154,7 @@ def _make_mortgages(db, uid, props):
     """Mortgages for financed properties."""
     data = [
         Mortgage(
-            property_id=props["Sunset Villa"].id, user_id=uid,
+            property_id=props["Sunset Villa"].id,
             lender_name="Wells Fargo", loan_number="WF-3847291",
             loan_type="30-Year Fixed", interest_rate=3.500,
             original_amount=360000, current_balance=312000,
@@ -164,7 +164,7 @@ def _make_mortgages(db, uid, props):
             autopay_enabled=True,
         ),
         Mortgage(
-            property_id=props["Downtown Office"].id, user_id=uid,
+            property_id=props["Downtown Office"].id,
             lender_name="Chase Commercial", loan_number="CH-88204",
             loan_type="20-Year Commercial", interest_rate=4.200,
             original_amount=960000, current_balance=795000,
@@ -174,7 +174,7 @@ def _make_mortgages(db, uid, props):
             autopay_enabled=True,
         ),
         Mortgage(
-            property_id=props["Oakwood Townhomes"].id, user_id=uid,
+            property_id=props["Oakwood Townhomes"].id,
             lender_name="Bank of America", loan_number="BOA-55123",
             loan_type="25-Year Commercial", interest_rate=3.800,
             original_amount=960000, current_balance=720000,
@@ -184,7 +184,7 @@ def _make_mortgages(db, uid, props):
             autopay_enabled=False,
         ),
         Mortgage(
-            property_id=props["Riverfront Warehouse"].id, user_id=uid,
+            property_id=props["Riverfront Warehouse"].id,
             lender_name="PNC Commercial", loan_number="PNC-66290",
             loan_type="20-Year Commercial", interest_rate=4.500,
             original_amount=760000, current_balance=620000,
@@ -194,7 +194,7 @@ def _make_mortgages(db, uid, props):
             autopay_enabled=True,
         ),
         Mortgage(
-            property_id=props["Main Street Retail"].id, user_id=uid,
+            property_id=props["Main Street Retail"].id,
             lender_name="US Bank", loan_number="USB-33418",
             loan_type="15-Year Commercial", interest_rate=4.000,
             original_amount=700000, current_balance=580000,
@@ -214,7 +214,7 @@ def _make_insurance(db, uid, props):
     """Insurance for all properties."""
     policies = [
         InsurancePolicy(
-            property_id=props["Sunset Villa"].id, user_id=uid,
+            property_id=props["Sunset Villa"].id,
             provider_name="State Farm", policy_number="SF-1001",
             policy_type="Landlord Insurance", coverage_amount=550000,
             deductible=2500, annual_premium=1800,
@@ -224,7 +224,7 @@ def _make_insurance(db, uid, props):
             agent_email="mike@statefarm.com",
         ),
         InsurancePolicy(
-            property_id=props["Downtown Office"].id, user_id=uid,
+            property_id=props["Downtown Office"].id,
             provider_name="Travelers", policy_number="TR-2002",
             policy_type="Commercial Property", coverage_amount=1500000,
             deductible=5000, annual_premium=4200,
@@ -234,7 +234,7 @@ def _make_insurance(db, uid, props):
             agent_email="sarah@travelers.com",
         ),
         InsurancePolicy(
-            property_id=props["Harbor Loft"].id, user_id=uid,
+            property_id=props["Harbor Loft"].id,
             provider_name="Allstate", policy_number="AL-3003",
             policy_type="Condo Insurance", coverage_amount=900000,
             deductible=1500, annual_premium=1200,
@@ -244,7 +244,7 @@ def _make_insurance(db, uid, props):
             agent_email="david@allstate.com",
         ),
         InsurancePolicy(
-            property_id=props["Green Acres Land"].id, user_id=uid,
+            property_id=props["Green Acres Land"].id,
             provider_name="Liberty Mutual", policy_number="LM-4004",
             policy_type="Land Liability", coverage_amount=500000,
             deductible=1000, annual_premium=600,
@@ -254,7 +254,7 @@ def _make_insurance(db, uid, props):
             agent_email="tom@libertymutual.com",
         ),
         InsurancePolicy(
-            property_id=props["Riverfront Warehouse"].id, user_id=uid,
+            property_id=props["Riverfront Warehouse"].id,
             provider_name="The Hartford", policy_number="TH-5005",
             policy_type="Warehouse Insurance", coverage_amount=1100000,
             deductible=7500, annual_premium=5600,
@@ -264,7 +264,7 @@ def _make_insurance(db, uid, props):
             agent_email="lisa@thehartford.com",
         ),
         InsurancePolicy(
-            property_id=props["Parkview Condo"].id, user_id=uid,
+            property_id=props["Parkview Condo"].id,
             provider_name="Allstate", policy_number="AL-6006",
             policy_type="Condo Insurance", coverage_amount=650000,
             deductible=1500, annual_premium=1100,
@@ -274,7 +274,7 @@ def _make_insurance(db, uid, props):
             agent_email="david@allstate.com",
         ),
         InsurancePolicy(
-            property_id=props["Main Street Retail"].id, user_id=uid,
+            property_id=props["Main Street Retail"].id,
             provider_name="Travelers", policy_number="TR-7007",
             policy_type="Retail Property", coverage_amount=1000000,
             deductible=5000, annual_premium=3800,
@@ -284,7 +284,7 @@ def _make_insurance(db, uid, props):
             agent_email="sarah@travelers.com",
         ),
         InsurancePolicy(
-            property_id=props["Lakeside Cottage"].id, user_id=uid,
+            property_id=props["Lakeside Cottage"].id,
             provider_name="State Farm", policy_number="SF-8008",
             policy_type="Vacation Rental Insurance", coverage_amount=375000,
             deductible=2000, annual_premium=1400,
@@ -294,7 +294,7 @@ def _make_insurance(db, uid, props):
             agent_email="mike@statefarm.com",
         ),
         InsurancePolicy(
-            property_id=props["Oakwood Townhomes"].id, user_id=uid,
+            property_id=props["Oakwood Townhomes"].id,
             provider_name="Nationwide", policy_number="NW-9009",
             policy_type="Multi-Family Property", coverage_amount=1600000,
             deductible=5000, annual_premium=4800,
@@ -304,7 +304,7 @@ def _make_insurance(db, uid, props):
             agent_email="rachel@nationwide.com",
         ),
         InsurancePolicy(
-            property_id=props["Desert Oasis"].id, user_id=uid,
+            property_id=props["Desert Oasis"].id,
             provider_name="Liberty Mutual", policy_number="LM-1010",
             policy_type="Homeowner Insurance", coverage_amount=350000,
             deductible=2000, annual_premium=1300,
