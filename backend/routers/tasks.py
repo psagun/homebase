@@ -13,7 +13,7 @@ from backend.services import task_service
 router = APIRouter()
 
 
-@router.get("/", response_model=list[TaskResponse])
+@router.get("", response_model=list[TaskResponse])
 def list_tasks(
     status: Optional[str] = Query(None),
     task_type: Optional[str] = Query(None),
@@ -25,7 +25,7 @@ def list_tasks(
     return task_service.list_tasks(db, current_user.id, status, task_type, priority, property_id, search)
 
 
-@router.post("/", response_model=TaskResponse, status_code=201)
+@router.post("", response_model=TaskResponse, status_code=201)
 def create_task(
     data: TaskCreate,
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db),

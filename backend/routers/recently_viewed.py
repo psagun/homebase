@@ -28,7 +28,7 @@ def _serialize_property(p: Property) -> dict:
     }
 
 
-@router.get("/")
+@router.get("")
 def list_recently_viewed(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

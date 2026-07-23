@@ -12,7 +12,7 @@ from backend.services import property_service
 router = APIRouter()
 
 
-@router.get("/", response_model=list[PropertyResponse])
+@router.get("", response_model=list[PropertyResponse])
 def list_properties(
     search: Optional[str] = Query(None),
     status: Optional[str] = Query(None),
@@ -30,7 +30,7 @@ def list_properties(
     )
 
 
-@router.post("/", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)
+@router.post("", response_model=PropertyResponse, status_code=status.HTTP_201_CREATED)
 def create_property(
     data: PropertyCreate,
     current_user: User = Depends(get_current_user),

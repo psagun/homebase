@@ -12,7 +12,7 @@ from backend.services import contact_service
 router = APIRouter()
 
 
-@router.get("/", response_model=list[ContactResponse])
+@router.get("", response_model=list[ContactResponse])
 def list_contacts(
     contact_type: Optional[str] = Query(None),
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db),
@@ -20,7 +20,7 @@ def list_contacts(
     return contact_service.list_contacts(db, current_user.id, contact_type)
 
 
-@router.post("/", response_model=ContactResponse, status_code=201)
+@router.post("", response_model=ContactResponse, status_code=201)
 def create_contact(
     data: ContactCreate,
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db),
