@@ -1,22 +1,20 @@
-"""Vercel serverless entry point.
-
-Vercel detects 'app' at this path and routes all /api/* traffic here.
-The rewrites in vercel.json send /api/(.*) → /api, and FastAPI
-routes internally from /api/v1/... based on the APIRouter prefix.
-"""
+"""Vercel serverless entry point for FastAPI backend."""
 import sys
+import os
 from pathlib import Path
 
-# Ensure the backend package is importable
-sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
+# Ensure the project root is importable
+_root = str(Path(__file__).resolve().parent.parent)
+if _root not in sys.path:
+    sys.path.insert(0, _root)
+
+# Change working directory to project root (Vercel cwd is often different)
+os.chdir(_root)
 
 from backend.main import app  # noqa: E402
 
-# Ensure all tables are created on Vercel cold start
+# Auto-create tables on cold start
 from backend.database import Base, engine  # noqa: E402
-from backend.models import (  # noqa: E402
-    User, Property, Mortgage, InsurancePolicy, Document,
-    Task, Transaction, Contact, PropertyTax, Tenant,
-    MaintenanceRecord, RecentlyViewed,
-)
+from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed  # noqa: E402, F401
+
 Base.metadata.create_all(bind=engine)
