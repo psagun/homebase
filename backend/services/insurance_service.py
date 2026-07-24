@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.insurance_policy import InsurancePolicy
 from backend.models.property import Property
-from backend.models.task import Task, TaskStatus, TaskType
+from backend.models.task import Task, TaskPriority, TaskStatus, TaskType
 
 
 def _get_property_or_404(db: Session, user_id, property_id) -> Property:
@@ -68,12 +68,14 @@ def create_policy(db: Session, user_id, property_id, data) -> InsurancePolicy:
     )
     db.add(policy)
     db.commit()
+    _sync_task_due_date(db, user_id, policy.property_id, policy.renewal_date)
+    db.commit()
     db.refresh(policy)
     return policy
 
 
-def _sync_task_due_date(db: Session, property_id, due_date):
-    """Update any INSURANCE_RENEWAL task for this property."""
+def _sync_task_due_date(db: Session, user_id, property_id, due_date):
+    """Create or update an INSURANCE_RENEWAL task for this property."""
     if not property_id or not due_date:
         return
     task = db.query(Task).filter(
@@ -83,7 +85,20 @@ def _sync_task_due_date(db: Session, property_id, due_date):
     ).first()
     if task:
         task.due_date = due_date
-        db.flush()
+    else:
+        prop = db.query(Property).filter(Property.id == property_id).first()
+        prop_name = prop.name if prop else "Property"
+        task = Task(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            property_id=property_id,
+            title=f"Renew insurance - {prop_name}",
+            task_type=TaskType.INSURANCE_RENEWAL,
+            due_date=due_date,
+            priority=TaskPriority.MEDIUM,
+            status=TaskStatus.UPCOMING,
+        )
+        db.add(task)
 
 
 def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
@@ -118,7 +133,7 @@ def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
         )
         db.add(new_policy)
         db.commit()
-        _sync_task_due_date(db, new_policy.property_id, new_policy.renewal_date)
+        _sync_task_due_date(db, user_id, new_policy.property_id, new_policy.renewal_date)
         db.commit()
         db.refresh(new_policy)
         return new_policy
@@ -126,7 +141,7 @@ def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
     for key, value in update_data.items():
         setattr(policy, key, value)
     db.commit()
-    _sync_task_due_date(db, policy.property_id, policy.renewal_date)
+    _sync_task_due_date(db, user_id, policy.property_id, policy.renewal_date)
     db.commit()
     db.refresh(policy)
     return policy

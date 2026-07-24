@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.mortgage import Mortgage
 from backend.models.property import Property
-from backend.models.task import Task, TaskStatus, TaskType
+from backend.models.task import Task, TaskPriority, TaskStatus, TaskType
 
 
 def _get_property_or_404(db: Session, user_id, property_id) -> Property:
@@ -73,6 +73,8 @@ def create_mortgage(db: Session, user_id, property_id, data) -> Mortgage:
     )
     db.add(mortgage)
     db.commit()
+    _sync_task_due_date(db, user_id, mortgage.property_id, mortgage.next_due_date)
+    db.commit()
     db.refresh(mortgage)
     return mortgage
 
@@ -115,7 +117,7 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
         db.add(new_mortgage)
         db.commit()
         # Sync task due date
-        _sync_task_due_date(db, new_mortgage.property_id, new_mortgage.next_due_date)
+        _sync_task_due_date(db, user_id, new_mortgage.property_id, new_mortgage.next_due_date)
         db.commit()
         db.refresh(new_mortgage)
         return new_mortgage
@@ -124,14 +126,14 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
     for key, value in update_data.items():
         setattr(mortgage, key, value)
     db.commit()
-    _sync_task_due_date(db, mortgage.property_id, mortgage.next_due_date)
+    _sync_task_due_date(db, user_id, mortgage.property_id, mortgage.next_due_date)
     db.commit()
     db.refresh(mortgage)
     return mortgage
 
 
-def _sync_task_due_date(db: Session, property_id, due_date):
-    """Update any MORTGAGE_PAYMENT task for this property to match the mortgage due date."""
+def _sync_task_due_date(db: Session, user_id, property_id, due_date):
+    """Create or update a MORTGAGE_PAYMENT task for this property."""
     if not property_id or not due_date:
         return
     task = db.query(Task).filter(
@@ -141,6 +143,21 @@ def _sync_task_due_date(db: Session, property_id, due_date):
     ).first()
     if task:
         task.due_date = due_date
+    else:
+        # Auto-create a mortgage payment task
+        prop = db.query(Property).filter(Property.id == property_id).first()
+        prop_name = prop.name if prop else "Property"
+        task = Task(
+            id=uuid.uuid4(),
+            user_id=user_id,
+            property_id=property_id,
+            title=f"Mortgage payment - {prop_name}",
+            task_type=TaskType.MORTGAGE_PAYMENT,
+            due_date=due_date,
+            priority=TaskPriority.MEDIUM,
+            status=TaskStatus.UPCOMING,
+        )
+        db.add(task)
 
 
 def delete_mortgage(db: Session, user_id, mortgage_id) -> None:
