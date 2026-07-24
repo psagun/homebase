@@ -3,6 +3,7 @@ import { api } from "./client";
 export interface TaskData {
   id: string;
   property_id?: string | null;
+  property_name?: string | null;
   user_id: string;
   title: string;
   description?: string | null;
