@@ -93,7 +93,7 @@ export default function DashboardPage() {
                     className="flex items-center gap-3 px-5 py-3 hover:bg-[#f8f9fc] transition-colors group">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: bg, color }}><Icon className="h-4 w-4" /></div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[#1a1d2b] truncate group-hover:text-[#3b82f6] transition-colors">{r.title}</p>
+                      <p className="text-sm font-medium text-[#1a1d2b] line-clamp-2 group-hover:text-[#3b82f6] transition-colors">{r.title}</p>
                       <p className="text-xs text-[#8b8fa3]">{r.task_type}</p>
                     </div>
                     <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${relCls}`}>{rel}</span>
@@ -185,7 +185,7 @@ export default function DashboardPage() {
             </h2>
             <Link href="/properties" className="text-xs text-[#3b82f6] font-medium hover:underline">View all</Link>
           </div>
-          <div className="flex gap-3 w-full">
+          <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {display.map((p: any, idx: number) => {
               const type = (p.property_type || "").toLowerCase();
               let buildingSvg = null;
@@ -208,7 +208,7 @@ export default function DashboardPage() {
               }
               return (
                 <Link key={p.id} href={`/properties/${p.id}`}
-                  className="flex-1 min-w-0 group bg-white rounded-xl border border-[#e8eaed] shadow-sm overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
+                  className="group bg-white rounded-xl border border-[#e8eaed] shadow-sm overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
                   <div className={`h-28 relative overflow-hidden bg-gradient-to-br ${skyGrad}`}>
                     {buildingSvg}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
