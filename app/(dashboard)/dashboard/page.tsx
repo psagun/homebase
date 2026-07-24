@@ -208,7 +208,7 @@ export default function DashboardPage() {
               }
               return (
                 <Link key={p.id} href={`/properties/${p.id}`}
-                  className="group bg-white rounded-xl border border-[#e8eaed] shadow-sm overflow-hidden hover:shadow-md transition-all hover:-translate-y-0.5">
+                  className="group bg-white rounded-xl border border-[#e8eaed] shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
                   <div className={`h-28 relative overflow-hidden bg-gradient-to-br ${skyGrad}`}>
                     {buildingSvg}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
