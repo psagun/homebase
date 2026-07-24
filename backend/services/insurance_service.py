@@ -119,6 +119,7 @@ def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
         db.add(new_policy)
         db.commit()
         _sync_task_due_date(db, new_policy.property_id, new_policy.renewal_date)
+        db.commit()
         db.refresh(new_policy)
         return new_policy
 
@@ -126,6 +127,7 @@ def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
         setattr(policy, key, value)
     db.commit()
     _sync_task_due_date(db, policy.property_id, policy.renewal_date)
+    db.commit()
     db.refresh(policy)
     return policy
 

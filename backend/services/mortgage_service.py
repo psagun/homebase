@@ -116,6 +116,7 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
         db.commit()
         # Sync task due date
         _sync_task_due_date(db, new_mortgage.property_id, new_mortgage.next_due_date)
+        db.commit()
         db.refresh(new_mortgage)
         return new_mortgage
 
@@ -124,6 +125,7 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
         setattr(mortgage, key, value)
     db.commit()
     _sync_task_due_date(db, mortgage.property_id, mortgage.next_due_date)
+    db.commit()
     db.refresh(mortgage)
     return mortgage
 
@@ -139,7 +141,6 @@ def _sync_task_due_date(db: Session, property_id, due_date):
     ).first()
     if task:
         task.due_date = due_date
-        db.flush()
 
 
 def delete_mortgage(db: Session, user_id, mortgage_id) -> None:
