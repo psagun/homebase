@@ -14,7 +14,21 @@ os.chdir(_root)
 from backend.main import app  # noqa: E402
 
 # Auto-create tables on cold start
+
+
+def _migrate_add_column(engine, table, column, coltype):
+    """Add a column if it doesn't already exist (safe to run repeatedly)."""
+    from sqlalchemy import inspect, text
+    inspector = inspect(engine)
+    if column not in [c["name"] for c in inspector.get_columns(table)]:
+        with engine.connect() as conn:
+            conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {coltype}"))
+            conn.commit()
+
 from backend.database import Base, engine  # noqa: E402
 from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed  # noqa: E402, F401
 
 Base.metadata.create_all(bind=engine)
+
+# Auto-migrate: add new columns that may not exist yet
+_migrate_add_column(engine, "users", "notifications_read_at", "TIMESTAMP WITH TIME ZONE")
