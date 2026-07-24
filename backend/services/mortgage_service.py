@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.mortgage import Mortgage
 from backend.models.property import Property
+from backend.models.task import Task, TaskStatus, TaskType
 
 
 def _get_property_or_404(db: Session, user_id, property_id) -> Property:
@@ -113,6 +114,8 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
         )
         db.add(new_mortgage)
         db.commit()
+        # Sync task due date
+        _sync_task_due_date(db, new_mortgage.property_id, new_mortgage.next_due_date)
         db.refresh(new_mortgage)
         return new_mortgage
 
@@ -120,8 +123,23 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
     for key, value in update_data.items():
         setattr(mortgage, key, value)
     db.commit()
+    _sync_task_due_date(db, mortgage.property_id, mortgage.next_due_date)
     db.refresh(mortgage)
     return mortgage
+
+
+def _sync_task_due_date(db: Session, property_id, due_date):
+    """Update any MORTGAGE_PAYMENT task for this property to match the mortgage due date."""
+    if not property_id or not due_date:
+        return
+    task = db.query(Task).filter(
+        Task.property_id == property_id,
+        Task.task_type == TaskType.MORTGAGE_PAYMENT,
+        Task.status.in_([TaskStatus.UPCOMING, TaskStatus.DUE_TODAY, TaskStatus.OVERDUE]),
+    ).first()
+    if task:
+        task.due_date = due_date
+        db.flush()
 
 
 def delete_mortgage(db: Session, user_id, mortgage_id) -> None:

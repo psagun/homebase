@@ -1,15 +1,28 @@
 """Notifications endpoint — aggregates data from tasks, insurance, mortgages."""
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta, timezone
+
 from fastapi import APIRouter, Depends
 from sqlalchemy.orm import Session
+
 from backend.dependencies import get_current_user, get_db
-from backend.models.user import User
-from backend.models.task import Task, TaskStatus
-from backend.models.mortgage import Mortgage
 from backend.models.insurance_policy import InsurancePolicy
+from backend.models.mortgage import Mortgage
 from backend.models.property import Property
+from backend.models.task import Task, TaskStatus
+from backend.models.user import User
 
 router = APIRouter()
+
+
+@router.post("/read")
+def mark_notifications_read(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Mark all notifications as read by updating the read timestamp."""
+    current_user.notifications_read_at = datetime.now(timezone.utc)
+    db.commit()
+    return {"status": "ok"}
 
 
 @router.get("")
@@ -122,6 +135,19 @@ def get_notifications(
     severity_order = {"error": 0, "warning": 1, "info": 2}
     notifications.sort(key=lambda n: (severity_order.get(n["severity"], 9), n.get("date", "")))
 
-    unread_count = sum(1 for n in notifications if not n["read"])
+    # Calculate read/unread based on last read timestamp
+    read_cutoff = current_user.notifications_read_at
+    unread_count = 0
+    for n in notifications:
+        if read_cutoff and n.get("date"):
+            try:
+                notif_date = datetime.strptime(n["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                n["read"] = notif_date <= read_cutoff
+            except (ValueError, TypeError):
+                n["read"] = False
+        else:
+            n["read"] = False
+        if not n["read"]:
+            unread_count += 1
 
     return {"notifications": notifications, "unread_count": unread_count}

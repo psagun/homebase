@@ -57,7 +57,15 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
         {/* Notification Bell */}
         <div className="relative" ref={dropdownRef}>
-          <button onClick={() => setNotifOpen(!notifOpen)} className="relative rounded-md border p-2 text-muted-foreground hover:bg-muted transition-colors">
+          <button onClick={() => {
+            setNotifOpen(!notifOpen);
+            if (!notifOpen) {
+              fetch("/api/v1/notifications/read", { method: "POST", credentials: "include" })
+                .then(r => r.json())
+                .then(() => setUnreadCount(0))
+                .catch(() => {});
+            }
+          }} className="relative rounded-md border p-2 text-muted-foreground hover:bg-muted transition-colors">
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">

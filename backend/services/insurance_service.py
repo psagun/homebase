@@ -8,6 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.insurance_policy import InsurancePolicy
 from backend.models.property import Property
+from backend.models.task import Task, TaskStatus, TaskType
 
 
 def _get_property_or_404(db: Session, user_id, property_id) -> Property:
@@ -71,6 +72,20 @@ def create_policy(db: Session, user_id, property_id, data) -> InsurancePolicy:
     return policy
 
 
+def _sync_task_due_date(db: Session, property_id, due_date):
+    """Update any INSURANCE_RENEWAL task for this property."""
+    if not property_id or not due_date:
+        return
+    task = db.query(Task).filter(
+        Task.property_id == property_id,
+        Task.task_type == TaskType.INSURANCE_RENEWAL,
+        Task.status.in_([TaskStatus.UPCOMING, TaskStatus.DUE_TODAY, TaskStatus.OVERDUE]),
+    ).first()
+    if task:
+        task.due_date = due_date
+        db.flush()
+
+
 def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
     policy = db.query(InsurancePolicy).filter(InsurancePolicy.id == policy_id).first()
     if not policy:
@@ -103,12 +118,14 @@ def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
         )
         db.add(new_policy)
         db.commit()
+        _sync_task_due_date(db, new_policy.property_id, new_policy.renewal_date)
         db.refresh(new_policy)
         return new_policy
 
     for key, value in update_data.items():
         setattr(policy, key, value)
     db.commit()
+    _sync_task_due_date(db, policy.property_id, policy.renewal_date)
     db.refresh(policy)
     return policy
 
