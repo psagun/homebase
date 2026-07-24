@@ -150,7 +150,7 @@ export default function DashboardPage() {
                 {stats.properties_by_status.map((item: any) => (
                   <div key={item.status} className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: STATUS_COLORS[item.status] || "#6b7280" }} />
-                    <span className="text-sm text-[#1a1d2b] flex-1 truncate">{item.status}</span>
+                    <span className="text-sm text-[#1a1d2b] flex-1">{item.status}</span>
                     <span className="text-sm font-semibold text-[#1a1d2b] tabular-nums">{item.count}</span>
                     <span className="text-xs text-[#8b8fa3] w-9 text-right">({((item.count/total)*100).toFixed(0)}%)</span>
                   </div>
@@ -215,7 +215,7 @@ export default function DashboardPage() {
                     <span className="absolute bottom-2 left-3 text-sm font-bold text-white drop-shadow-lg">{formatCurrency(p.current_value)}</span>
                   </div>
                   <div className="p-3">
-                    <p className="text-sm font-semibold text-[#1a1d2b] truncate group-hover:text-[#3b82f6] transition-colors">{p.name}</p>
+                    <p className="text-sm font-semibold text-[#1a1d2b] line-clamp-1 group-hover:text-[#3b82f6] transition-colors">{p.name}</p>
                     <p className="text-xs text-[#8b8fa3] truncate">{p.city}, {p.state}</p>
                     <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                       p.status === "Occupied" ? "bg-emerald-50 text-emerald-700" :
@@ -237,11 +237,11 @@ function SumCard({ icon, bg, color, label, value, sub, subColor }: {
   icon: React.ReactNode; bg: string; color: string; label: string; value: string; sub: string; subColor: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-4 flex items-center gap-4">
-      <div className="flex h-12 w-12 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: bg, color }}>{icon}</div>
-      <div className="min-w-0">
+    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-3 md:p-4 flex items-center gap-3 md:gap-4">
+      <div className="flex h-10 w-10 md:h-12 md:w-12 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: bg, color }}>{icon}</div>
+      <div className="min-w-0 flex-1">
         <p className="text-xs font-medium text-[#8b8fa3] uppercase tracking-wide">{label}</p>
-        <p className="text-lg font-bold text-[#1a1d2b] mt-0.5">{value}</p>
+        <p className="text-sm md:text-lg font-bold text-[#1a1d2b] mt-0.5">{value}</p>
         <p className="text-xs font-medium mt-0.5" style={{ color: subColor }}>{sub}</p>
       </div>
     </div>
