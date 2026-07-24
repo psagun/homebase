@@ -68,6 +68,14 @@ def get_dashboard_summary(db: Session) -> dict[str, Any]:
     due_today_tasks = [t for t in all_tasks if t.status == TaskStatus.DUE_TODAY or (t.due_date and t.due_date == today)]
     upcoming_tasks = [t for t in all_tasks if t not in overdue_tasks and t not in due_today_tasks][:5]
 
+    # Load property relationships for reminders
+    from sqlalchemy.orm import joinedload
+    task_ids = [t.id for t in (overdue_tasks[:5] + due_today_tasks[:5] + upcoming_tasks)]
+    tasks_with_props = db.query(Task).options(joinedload(Task.property)).filter(
+        Task.id.in_(task_ids)
+    ).all() if task_ids else []
+    prop_map = {str(t.id): t.property.name if t.property else None for t in tasks_with_props}
+
     reminders = [
         {
             "id": str(t.id),
@@ -77,6 +85,7 @@ def get_dashboard_summary(db: Session) -> dict[str, Any]:
             "priority": t.priority.value if hasattr(t.priority, "value") else str(t.priority),
             "status": t.status.value if hasattr(t.status, "value") else str(t.status),
             "property_id": str(t.property_id) if t.property_id else None,
+            "property_name": prop_map.get(str(t.id)),
         }
         for t in (overdue_tasks[:5] + due_today_tasks[:5] + upcoming_tasks)
     ]

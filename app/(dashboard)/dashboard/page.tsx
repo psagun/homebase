@@ -95,6 +95,9 @@ export default function DashboardPage() {
                     <div className="min-w-0 flex-1">
                       <p className="text-sm font-medium text-[#1a1d2b] line-clamp-2 group-hover:text-[#3b82f6] transition-colors">{r.title}</p>
                       <p className="text-xs text-[#8b8fa3]">{r.task_type}</p>
+                      {r.property_name && (
+                        <p className="text-[10px] text-[#8b8fa3]/70 mt-0.5">{r.property_name}</p>
+                      )}
                     </div>
                     <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${relCls}`}>{rel}</span>
                     <ChevronRight className="h-4 w-4 text-[#c4c6d0] group-hover:text-[#3b82f6] transition-colors shrink-0" />

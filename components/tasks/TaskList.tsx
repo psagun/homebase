@@ -92,7 +92,10 @@ export function TaskList({ propertyId }: { propertyId?: string }) {
               </button>
               <div className="flex-1 min-w-0">
                 <p className={`text-sm font-medium ${task.status === "Completed" ? "line-through text-muted-foreground" : ""}`}>{task.title}</p>
-                <div className="flex items-center gap-2 mt-1">
+                <div className="flex items-center gap-2 mt-1 flex-wrap">
+                  {task.property_name && (
+                    <span className="text-xs text-muted-foreground/70">{task.property_name}</span>
+                  )}
                   <span className="text-xs text-muted-foreground">{task.task_type}</span>
                   <span className={`rounded-full px-2 py-0.5 text-[10px] font-medium ${priorityColors[task.priority] || ""}`}>{task.priority}</span>
                   {task.due_date && (

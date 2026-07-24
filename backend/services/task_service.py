@@ -5,8 +5,7 @@ from datetime import date, datetime, timezone
 from typing import Optional
 
 from fastapi import HTTPException, status
-from sqlalchemy import or_
-from sqlalchemy.orm import Session
+from sqlalchemy.orm import Session, joinedload
 
 from backend.models.task import Task, TaskStatus, TaskPriority, TaskType
 
@@ -64,9 +63,12 @@ def list_tasks(
         query = query.filter(Task.title.ilike(term))
 
     # Refresh status before returning
-    tasks = query.order_by(Task.due_date.asc().nullslast(), Task.created_at.desc()).all()
+    tasks = query.options(joinedload(Task.property)).order_by(
+        Task.due_date.asc().nullslast(), Task.created_at.desc()
+    ).all()
     for t in tasks:
         _refresh_status(t)
+        t.property_name = t.property.name if t.property else None
     db.commit()
     return tasks
 
@@ -98,6 +100,11 @@ def get_task(db: Session, user_id, task_id) -> Task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
     _refresh_status(task)
     db.commit()
+    # Fetch property name from relationship
+    if hasattr(task, "property") and task.property:
+        task.property_name = task.property.name
+    else:
+        task.property_name = None
     return task
 
 

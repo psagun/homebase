@@ -27,6 +27,7 @@ class TaskUpdate(BaseModel):
 class TaskResponse(BaseModel):
     id: uuid.UUID
     property_id: Optional[uuid.UUID] = None
+    property_name: Optional[str] = None
     user_id: uuid.UUID
     title: str
     description: Optional[str] = None
