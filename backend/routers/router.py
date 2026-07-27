@@ -14,6 +14,7 @@ from backend.routers.contacts import router as contacts_router
 from backend.routers.property_modules import router as property_modules_router
 from backend.routers.notifications import router as notifications_router
 from backend.routers.recently_viewed import router as recently_viewed_router
+from backend.routers.reports import router as reports_router
 from backend.routers.seed import router as seed_router
 
 api_router = APIRouter(prefix="/api/v1")
@@ -31,4 +32,5 @@ api_router.include_router(property_modules_router, tags=["property-modules"])
 api_router.include_router(notifications_router, prefix="/notifications", tags=["notifications"])
 api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboard"])
 api_router.include_router(recently_viewed_router, prefix="/recently-viewed", tags=["recently-viewed"])
+api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(seed_router, prefix="/seed", tags=["seed"])
