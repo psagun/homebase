@@ -36,12 +36,6 @@ def _get_user_properties(db: Session, user: User) -> list[Property]:
         )
 
 
-def _get_user_property_ids(db: Session, user: User) -> list[Any]:
-    """Return the list of property IDs visible to the given user."""
-    properties = _get_user_properties(db, user)
-    return [p.id for p in properties]
-
-
 def get_dashboard_summary(db: Session, user: User) -> dict[str, Any]:
     """Aggregate portfolio-level metrics from all data sources."""
     properties = _get_user_properties(db, user)
@@ -95,7 +89,7 @@ def get_dashboard_summary(db: Session, user: User) -> dict[str, Any]:
     task_query = db.query(Task).filter(
         Task.status.notin_([TaskStatus.COMPLETED, TaskStatus.DISMISSED])
     )
-    if user.role == "investor":
+    if property_ids:
         task_query = task_query.filter(Task.property_id.in_(property_ids))
     all_tasks = task_query.order_by(Task.due_date.asc()).all()
 
@@ -127,7 +121,7 @@ def get_dashboard_summary(db: Session, user: User) -> dict[str, Any]:
 
     # ---- Mortgage summary ----
     mortgage_query = db.query(Mortgage).filter(Mortgage.is_active == True)
-    if user.role == "investor":
+    if property_ids:
         mortgage_query = mortgage_query.filter(Mortgage.property_id.in_(property_ids))
     active_mortgages = mortgage_query.all()
     total_monthly_payment = sum(float(m.monthly_payment or 0) for m in active_mortgages)
@@ -135,7 +129,7 @@ def get_dashboard_summary(db: Session, user: User) -> dict[str, Any]:
 
     # ---- Insurance summary ----
     policy_query = db.query(InsurancePolicy).filter(InsurancePolicy.is_active == True)
-    if user.role == "investor":
+    if property_ids:
         policy_query = policy_query.filter(InsurancePolicy.property_id.in_(property_ids))
     active_policies = policy_query.all()
     next_renewal = None
