@@ -26,9 +26,14 @@ def _migrate_add_column(engine, table, column, coltype):
             conn.commit()
 
 from backend.database import Base, engine  # noqa: E402
-from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed  # noqa: E402, F401
+from sqlalchemy import text  # noqa: E402
+from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed, PropertyInvestor  # noqa: E402, F401
 
 Base.metadata.create_all(bind=engine)
 
 # Auto-migrate: add new columns that may not exist yet
 _migrate_add_column(engine, "users", "notifications_read_at", "TIMESTAMP WITH TIME ZONE")
+_migrate_add_column(engine, "users", "role", "VARCHAR(20)")
+with engine.connect() as conn:
+    conn.execute(text("UPDATE users SET role = 'admin' WHERE role IS NULL"))
+    conn.commit()

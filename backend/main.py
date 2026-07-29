@@ -5,8 +5,8 @@ from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
-
 from backend.config import settings
+from backend.database import Base, engine
 from backend.routers.router import api_router
 
 
@@ -41,6 +41,10 @@ class DynamicCORSMiddleware(BaseHTTPMiddleware):
 
 @asynccontextmanager
 async def lifespan(app: FastAPI):
+    # Auto-create tables for local SQLite development
+    if settings.database_url.startswith("sqlite"):
+        import backend.models  # noqa: F401 — register all models with Base.metadata
+        Base.metadata.create_all(bind=engine)
     yield
 
 
