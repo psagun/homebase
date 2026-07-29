@@ -16,6 +16,7 @@ from backend.routers.notifications import router as notifications_router
 from backend.routers.recently_viewed import router as recently_viewed_router
 from backend.routers.reports import router as reports_router
 from backend.routers.seed import router as seed_router
+from backend.routers.admin import router as admin_router
 
 api_router = APIRouter(prefix="/api/v1")
 api_router.include_router(health_router, prefix="/health", tags=["health"])
@@ -34,3 +35,4 @@ api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboar
 api_router.include_router(recently_viewed_router, prefix="/recently-viewed", tags=["recently-viewed"])
 api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(seed_router, prefix="/seed", tags=["seed"])
+api_router.include_router(admin_router, prefix="/admin", tags=["admin"])
