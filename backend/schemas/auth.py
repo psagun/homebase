@@ -22,6 +22,7 @@ class UserResponse(BaseModel):
     id: uuid.UUID
     email: str
     name: str
+    role: str = "admin"
     avatar_url: str | None = None
     created_at: datetime
 

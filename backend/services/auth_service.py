@@ -107,11 +107,13 @@ class AuthService:
             user_id=str(user.id),
             token_type=ACCESS_TOKEN_TYPE,
             expires_delta=timedelta(minutes=settings.access_token_expire_minutes),
+            role=str(user.role),
         )
         refresh_token = self._create_token(
             user_id=str(user.id),
             token_type=REFRESH_TOKEN_TYPE,
             expires_delta=timedelta(days=settings.refresh_token_expire_days),
+            role=str(user.role),
         )
 
         return {
@@ -122,15 +124,17 @@ class AuthService:
                 "id": str(user.id),
                 "email": user.email,
                 "name": user.name,
+                "role": user.role,
                 "created_at": user.created_at,
             },
         }
 
-    def _create_token(self, user_id: str, token_type: str, expires_delta: timedelta) -> str:
+    def _create_token(self, user_id: str, token_type: str, expires_delta: timedelta, role: str = "admin") -> str:
         now = datetime.now(timezone.utc)
         payload = {
             "sub": user_id,
             "type": token_type,
+            "role": role,
             "iat": now,
             "exp": now + expires_delta,
         }

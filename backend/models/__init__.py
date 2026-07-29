@@ -11,3 +11,4 @@ from backend.models.property_tax import PropertyTax  # noqa: F401
 from backend.models.tenant import Tenant  # noqa: F401
 from backend.models.maintenance_record import MaintenanceRecord  # noqa: F401
 from backend.models.recently_viewed import RecentlyViewed  # noqa: F401
+from backend.models.property_investor import PropertyInvestor  # noqa: F401

@@ -16,6 +16,7 @@ class User(Base):
     password_hash = Column(String(255), nullable=False)
     name = Column(String(200), nullable=False)
     is_admin = Column(Boolean, default=False, nullable=False)
+    role = Column(String(20), default="admin", nullable=False)
     avatar_url = Column(String(500), nullable=True)
     notifications_read_at = Column(DateTime(timezone=True), nullable=True)
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
