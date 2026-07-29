@@ -9,11 +9,43 @@ from backend.models.property import Property, PropertyStatus
 from backend.models.mortgage import Mortgage
 from backend.models.insurance_policy import InsurancePolicy
 from backend.models.task import Task, TaskStatus
+from backend.models.user import User
+from backend.models.property_investor import PropertyInvestor
 
 
-def get_dashboard_summary(db: Session) -> dict[str, Any]:
+def _get_user_properties(db: Session, user: User) -> list[Property]:
+    """Return the list of properties visible to the given user based on their role."""
+    if user.role == "investor":
+        return (
+            db.query(Property)
+            .join(PropertyInvestor)
+            .filter(
+                PropertyInvestor.user_id == user.id,
+                Property.archived_at.is_(None),
+            )
+            .all()
+        )
+    else:
+        return (
+            db.query(Property)
+            .filter(
+                Property.user_id == user.id,
+                Property.archived_at.is_(None),
+            )
+            .all()
+        )
+
+
+def _get_user_property_ids(db: Session, user: User) -> list[Any]:
+    """Return the list of property IDs visible to the given user."""
+    properties = _get_user_properties(db, user)
+    return [p.id for p in properties]
+
+
+def get_dashboard_summary(db: Session, user: User) -> dict[str, Any]:
     """Aggregate portfolio-level metrics from all data sources."""
-    properties = db.query(Property).filter(Property.archived_at.is_(None)).all()
+    properties = _get_user_properties(db, user)
+    property_ids = [p.id for p in properties]
     today = date.today()
 
     # ---- Property stats ----
@@ -60,9 +92,12 @@ def get_dashboard_summary(db: Session) -> dict[str, Any]:
     ]
 
     # ---- Task reminders ----
-    all_tasks = db.query(Task).filter(
+    task_query = db.query(Task).filter(
         Task.status.notin_([TaskStatus.COMPLETED, TaskStatus.DISMISSED])
-    ).order_by(Task.due_date.asc()).all()
+    )
+    if user.role == "investor":
+        task_query = task_query.filter(Task.property_id.in_(property_ids))
+    all_tasks = task_query.order_by(Task.due_date.asc()).all()
 
     overdue_tasks = [t for t in all_tasks if t.status == TaskStatus.OVERDUE or (t.due_date and t.due_date < today)]
     due_today_tasks = [t for t in all_tasks if t.status == TaskStatus.DUE_TODAY or (t.due_date and t.due_date == today)]
@@ -91,12 +126,18 @@ def get_dashboard_summary(db: Session) -> dict[str, Any]:
     ]
 
     # ---- Mortgage summary ----
-    active_mortgages = db.query(Mortgage).filter(Mortgage.is_active == True).all()
+    mortgage_query = db.query(Mortgage).filter(Mortgage.is_active == True)
+    if user.role == "investor":
+        mortgage_query = mortgage_query.filter(Mortgage.property_id.in_(property_ids))
+    active_mortgages = mortgage_query.all()
     total_monthly_payment = sum(float(m.monthly_payment or 0) for m in active_mortgages)
     mortgage_count = len(active_mortgages)
 
     # ---- Insurance summary ----
-    active_policies = db.query(InsurancePolicy).filter(InsurancePolicy.is_active == True).all()
+    policy_query = db.query(InsurancePolicy).filter(InsurancePolicy.is_active == True)
+    if user.role == "investor":
+        policy_query = policy_query.filter(InsurancePolicy.property_id.in_(property_ids))
+    active_policies = policy_query.all()
     next_renewal = None
     for p in active_policies:
         if p.renewal_date and (next_renewal is None or p.renewal_date < next_renewal):
@@ -128,8 +169,8 @@ def get_dashboard_summary(db: Session) -> dict[str, Any]:
     }
 
 
-def get_properties_list(db: Session) -> list[dict[str, Any]]:
-    properties = db.query(Property).filter(Property.archived_at.is_(None)).all()
+def get_properties_list(db: Session, user: User) -> list[dict[str, Any]]:
+    properties = _get_user_properties(db, user)
     result = []
     for p in properties:
         purchase = float(p.purchase_price or 0)
