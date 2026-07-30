@@ -383,6 +383,10 @@ def get_property_ownership(
                 "email": r.email,
                 "phone": r.phone,
                 "ownership_percentage": float(r.ownership_percentage),
+                "portal_access": db.execute(
+                    text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
+                    {"email": r.email},
+                ).first() is not None if r.email else False,
             }
             for r in investor_rows
         ],
@@ -445,6 +449,10 @@ def set_property_ownership_entity(
                 "email": r.email,
                 "phone": r.phone,
                 "ownership_percentage": float(r.ownership_percentage),
+                "portal_access": db.execute(
+                    text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
+                    {"email": r.email},
+                ).first() is not None if r.email else False,
             }
             for r in investor_rows
         ],
