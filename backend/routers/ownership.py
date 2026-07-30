@@ -4,7 +4,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, status
-from sqlalchemy.orm import Session, joinedload
+from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
 from backend.models.user import User
@@ -108,39 +108,48 @@ def update_entity(
 # ─── Entity Investors ───
 
 
-@router.get("/ownership-entities/{entity_id}/investors", response_model=list[InvestorResponse])
+@router.get("/ownership-entities/{entity_id}/investors")
 def list_entity_investors(
     entity_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
     """List investors in an ownership entity with their percentages."""
-    entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == entity_id).first()
+    from sqlalchemy import text
+
+    entity = db.execute(
+        text("SELECT 1 FROM ownership_entities WHERE id = :eid"),
+        {"eid": entity_id},
+    ).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    links = (
-        db.query(OwnershipEntityInvestor)
-        .options(joinedload(OwnershipEntityInvestor.investor))
-        .filter(OwnershipEntityInvestor.ownership_entity_id == entity_id)
-        .all()
-    )
+    rows = db.execute(
+        text("""
+            SELECT i.id, i.name, i.email, i.phone, oei.ownership_percentage
+            FROM ownership_entity_investors oei
+            JOIN investors i ON i.id = oei.investor_id
+            WHERE oei.ownership_entity_id = :eid
+            ORDER BY oei.ownership_percentage DESC
+        """),
+        {"eid": entity_id},
+    ).fetchall()
 
     result = []
-    for link in links:
+    for row in rows:
         portal = False
-        if link.investor.email:
+        if row.email:
             portal_user = db.execute(
                 text("SELECT 1 FROM users WHERE email = :email"),
-                {"email": link.investor.email},
+                {"email": row.email},
             ).first()
             portal = portal_user is not None
         result.append({
-            "id": str(link.investor.id),
-            "name": link.investor.name,
-            "email": link.investor.email,
-            "phone": link.investor.phone,
-            "ownership_percentage": float(link.ownership_percentage),
+            "id": str(row.id),
+            "name": row.name,
+            "email": row.email,
+            "phone": row.phone,
+            "ownership_percentage": float(row.ownership_percentage),
             "portal_access": portal,
         })
     return result
