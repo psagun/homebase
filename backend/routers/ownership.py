@@ -151,7 +151,7 @@ def list_entity_investors(
     ]
 
 
-@router.post("/ownership-entities/{entity_id}/investors", response_model=InvestorResponse, status_code=201)
+@router.post("/ownership-entities/{entity_id}/investors", status_code=201)
 def add_entity_investor(
     entity_id: uuid.UUID,
     data: InvestorCreate,
