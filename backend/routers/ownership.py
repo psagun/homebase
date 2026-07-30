@@ -177,33 +177,24 @@ def add_entity_investor(
         )
 
     # Create or reuse investor
-    try:
-        investor = Investor(
-            id=uuid.uuid4(),
-            name=data.name,
-            email=data.email,
-            phone=data.phone,
-        )
-        db.add(investor)
-        db.flush()
-
-        link = OwnershipEntityInvestor(
-            ownership_entity_id=entity_id,
-            investor_id=investor.id,
-            ownership_percentage=data.ownership_percentage,
-        )
-        db.add(link)
-        db.commit()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
-
-    return InvestorResponse(
-        id=investor.id,
-        name=investor.name,
-        email=investor.email,
-        phone=investor.phone,
-        ownership_percentage=data.ownership_percentage,
+    inv_id = uuid.uuid4()
+    db.execute(
+        "INSERT INTO investors (id, name, email, phone) VALUES (?, ?, ?, ?)",
+        (str(inv_id), data.name, data.email, data.phone),
     )
+    db.execute(
+        "INSERT INTO ownership_entity_investors (ownership_entity_id, investor_id, ownership_percentage) VALUES (?, ?, ?)",
+        (str(entity_id), str(inv_id), float(data.ownership_percentage)),
+    )
+    db.commit()
+
+    return {
+        "id": str(inv_id),
+        "name": data.name,
+        "email": data.email,
+        "phone": data.phone,
+        "ownership_percentage": float(data.ownership_percentage),
+    }
 
 
 @router.patch("/ownership-entities/{entity_id}/investors/{investor_id}", response_model=InvestorResponse)
