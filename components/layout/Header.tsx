@@ -3,7 +3,8 @@
 import { useEffect, useRef, useState } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Search, Bell, Plus, Menu, AlertTriangle, Clock, Info, X } from "lucide-react";
+import { useTheme } from "next-themes";
+import { Search, Bell, Plus, Menu, AlertTriangle, Clock, Info, X, Sun, Moon } from "lucide-react";
 import { capitalize } from "@/lib/utils";
 
 type Notification = {
@@ -47,6 +48,10 @@ export function Header({ onMenuClick }: HeaderProps) {
     document.addEventListener("mousedown", handleClick);
     return () => document.removeEventListener("mousedown", handleClick);
   }, []);
+
+  const { theme, setTheme } = useTheme();
+
+  const toggleTheme = () => setTheme(theme === "dark" ? "light" : "dark");
 
   const severityIcon = (sev: string) => {
     if (sev === "error") return <AlertTriangle className="h-4 w-4 text-red-500" />;
@@ -116,6 +121,13 @@ export function Header({ onMenuClick }: HeaderProps) {
             </div>
           )}
         </div>
+
+        {/* Theme toggle */}
+        <button onClick={toggleTheme}
+          className="rounded-md border p-2 text-muted-foreground hover:bg-muted transition-colors"
+          title={theme === "dark" ? "Switch to light mode" : "Switch to dark mode"}>
+          {theme === "dark" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />}
+        </button>
 
         <Link href="/properties/new" className="hidden md:flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors">
           <Plus className="h-4 w-4" /> Add Property
