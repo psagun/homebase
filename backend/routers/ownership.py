@@ -416,6 +416,28 @@ def set_property_ownership_entity(
         text("UPDATE properties SET ownership_entity_id = :eid WHERE id = :pid"),
         {"eid": data.ownership_entity_id, "pid": property_id},
     )
+
+    # Link this property to portal users who are investors in this entity
+    portal_links = db.execute(
+        text("""
+            SELECT u.id AS user_id FROM ownership_entity_investors oei
+            JOIN investors i ON i.id = oei.investor_id
+            JOIN users u ON u.email = i.email AND u.role = 'investor'
+            WHERE oei.ownership_entity_id = :eid
+        """),
+        {"eid": data.ownership_entity_id},
+    ).fetchall()
+    for link in portal_links:
+        existing = db.execute(
+            text("SELECT 1 FROM property_investors WHERE property_id = :pid AND user_id = :uid"),
+            {"pid": property_id, "uid": link.user_id},
+        ).first()
+        if not existing:
+            db.execute(
+                text("INSERT INTO property_investors (property_id, user_id) VALUES (:pid, :uid)"),
+                {"pid": property_id, "uid": link.user_id},
+            )
+
     db.commit()
 
     investor_rows = db.execute(
