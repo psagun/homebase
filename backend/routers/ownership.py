@@ -145,11 +145,47 @@ def add_entity_investor(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Add an investor to an ownership entity (creates or links investor)."""
-    return {"status": "ok", "entity_id": str(entity_id), "name": data.name, "pct": data.ownership_percentage}
+    """Add an investor to an ownership entity."""
+    from decimal import Decimal
+    from sqlalchemy import text
+
+    entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == entity_id).first()
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    # Check total
+    existing_total = db.execute(
+        text("SELECT COALESCE(SUM(ownership_percentage), 0) FROM ownership_entity_investors WHERE ownership_entity_id = :eid"),
+        {"eid": entity_id},
+    ).scalar()
+
+    if float(existing_total) + data.ownership_percentage > 100:
+        raise HTTPException(
+            status_code=400,
+            detail=f"Total ownership would exceed 100%. Current total: {float(existing_total)}%",
+        )
+
+    inv_id = uuid.uuid4()
+    db.execute(
+        text("INSERT INTO investors (id, name, email, phone) VALUES (:id, :name, :email, :phone)"),
+        {"id": inv_id, "name": data.name, "email": data.email, "phone": data.phone},
+    )
+    db.execute(
+        text("INSERT INTO ownership_entity_investors (ownership_entity_id, investor_id, ownership_percentage) VALUES (:eid, :iid, :pct)"),
+        {"eid": entity_id, "iid": inv_id, "pct": Decimal(str(data.ownership_percentage))},
+    )
+    db.commit()
+
+    return {
+        "id": str(inv_id),
+        "name": data.name,
+        "email": data.email,
+        "phone": data.phone,
+        "ownership_percentage": float(data.ownership_percentage),
+    }
 
 
-@router.patch("/ownership-entities/{entity_id}/investors/{investor_id}", response_model=InvestorResponse)
+@router.patch("/ownership-entities/{entity_id}/investors/{investor_id}")
 def update_entity_investor(
     entity_id: uuid.UUID,
     investor_id: uuid.UUID,
@@ -158,53 +194,68 @@ def update_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Update an investor's details or ownership percentage."""
-    link = db.query(OwnershipEntityInvestor).filter(
-        OwnershipEntityInvestor.ownership_entity_id == entity_id,
-        OwnershipEntityInvestor.investor_id == investor_id,
+    from decimal import Decimal
+    from sqlalchemy import text
+
+    # Verify link exists
+    link = db.execute(
+        text("SELECT * FROM ownership_entity_investors WHERE ownership_entity_id = :eid AND investor_id = :iid"),
+        {"eid": entity_id, "iid": investor_id},
     ).first()
     if not link:
         raise HTTPException(status_code=404, detail="Investor not found in this entity")
 
-    investor = db.query(Investor).filter(Investor.id == investor_id).first()
-    if not investor:
-        raise HTTPException(status_code=404, detail="Investor not found")
-
     update_data = data.model_dump(exclude_unset=True)
 
-    # Update percentage
     if "ownership_percentage" in update_data:
-        # Calculate what other investors have
-        other_total = db.query(
-            db.func.coalesce(db.func.sum(OwnershipEntityInvestor.ownership_percentage), 0)
-        ).filter(
-            OwnershipEntityInvestor.ownership_entity_id == entity_id,
-            OwnershipEntityInvestor.investor_id != investor_id,
+        other_total = db.execute(
+            text("SELECT COALESCE(SUM(ownership_percentage), 0) FROM ownership_entity_investors WHERE ownership_entity_id = :eid AND investor_id != :iid"),
+            {"eid": entity_id, "iid": investor_id},
         ).scalar()
 
         if float(other_total) + update_data["ownership_percentage"] > 100:
             raise HTTPException(
                 status_code=400,
-                detail=f"Total ownership would exceed 100%. Other investors total: {float(other_total)}%",
+                detail=f"Total would exceed 100%. Other investors total: {float(other_total)}%",
             )
-        link.ownership_percentage = update_data.pop("ownership_percentage")
+        db.execute(
+            text("UPDATE ownership_entity_investors SET ownership_percentage = :pct WHERE ownership_entity_id = :eid AND investor_id = :iid"),
+            {"pct": Decimal(str(update_data["ownership_percentage"])), "eid": entity_id, "iid": investor_id},
+        )
 
-    # Update investor fields
+    # Build UPDATE for investors table
+    set_clauses = []
+    params = {"id": investor_id}
     for key in ("name", "email", "phone"):
         if key in update_data:
-            setattr(investor, key, update_data[key])
+            set_clauses.append(f"{key} = :{key}")
+            params[key] = update_data[key]
 
-    try:
-        db.commit()
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
+    if set_clauses:
+        db.execute(
+            text(f"UPDATE investors SET {', '.join(set_clauses)} WHERE id = :id"),
+            params,
+        )
 
-    return InvestorResponse(
-        id=investor.id,
-        name=investor.name,
-        email=investor.email,
-        phone=investor.phone,
-        ownership_percentage=float(link.ownership_percentage),
-    )
+    db.commit()
+
+    # Fetch updated data
+    inv = db.execute(
+        text("SELECT id, name, email, phone FROM investors WHERE id = :id"),
+        {"id": investor_id},
+    ).first()
+    pct = db.execute(
+        text("SELECT ownership_percentage FROM ownership_entity_investors WHERE ownership_entity_id = :eid AND investor_id = :iid"),
+        {"eid": entity_id, "iid": investor_id},
+    ).scalar()
+
+    return {
+        "id": str(inv.id),
+        "name": inv.name,
+        "email": inv.email,
+        "phone": inv.phone,
+        "ownership_percentage": float(pct),
+    }
 
 
 @router.delete("/ownership-entities/{entity_id}/investors/{investor_id}", status_code=204)
