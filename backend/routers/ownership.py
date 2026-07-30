@@ -131,7 +131,7 @@ def list_entity_investors(
         portal = False
         if link.investor.email:
             portal_user = db.execute(
-                text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
+                text("SELECT 1 FROM users WHERE email = :email"),
                 {"email": link.investor.email},
             ).first()
             portal = portal_user is not None
@@ -183,11 +183,11 @@ def add_entity_investor(
         {"eid": entity_id, "iid": inv_id, "pct": Decimal(str(data.ownership_percentage))},
     )
 
-    # Auto-link portal access if email matches an investor User
+    # Auto-link portal access if email matches a User
     portal_user_id = None
     if data.email:
         portal_user = db.execute(
-            text("SELECT id FROM users WHERE email = :email AND role = 'investor'"),
+            text("SELECT id FROM users WHERE email = :email"),
             {"email": data.email},
         ).first()
         if portal_user:
@@ -197,15 +197,15 @@ def add_entity_investor(
                 text("SELECT id FROM properties WHERE ownership_entity_id = :eid AND archived_at IS NULL"),
                 {"eid": entity_id},
             ).fetchall()
-            for prop in prop_ids:
+            for prop_row in prop_ids:
                 existing = db.execute(
                     text("SELECT 1 FROM property_investors WHERE property_id = :pid AND user_id = :uid"),
-                    {"pid": prop.id, "uid": portal_user.id},
+                    {"pid": prop_row[0], "uid": portal_user.id},
                 ).first()
                 if not existing:
                     db.execute(
                         text("INSERT INTO property_investors (property_id, user_id) VALUES (:pid, :uid)"),
-                        {"pid": prop.id, "uid": portal_user.id},
+                        {"pid": prop_row[0], "uid": portal_user.id},
                     )
 
     db.commit()
