@@ -211,7 +211,7 @@ function InvestorsSection({
   onUpdated,
 }: {
   entityId: string;
-  investors: { id: string; name: string; email?: string | null; phone?: string | null; ownership_percentage: number }[];
+  investors: { id: string; name: string; email?: string | null; phone?: string | null; ownership_percentage: number; portal_access?: boolean }[];
   onUpdated?: () => void;
 }) {
   const addInvestor = useAddEntityInvestor();
@@ -345,6 +345,7 @@ function InvestorsSection({
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase text-muted-foreground">Name</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase text-muted-foreground">Email</th>
                 <th className="text-left px-5 py-3 text-xs font-semibold uppercase text-muted-foreground">Phone</th>
+                <th className="text-center px-5 py-3 text-xs font-semibold uppercase text-muted-foreground">Portal</th>
                 <th className="text-right px-5 py-3 text-xs font-semibold uppercase text-muted-foreground">Ownership %</th>
                 <th className="text-right px-5 py-3 text-xs font-semibold uppercase text-muted-foreground">Actions</th>
               </tr>
@@ -355,6 +356,17 @@ function InvestorsSection({
                   <td className="px-5 py-3 text-sm font-medium">{inv.name}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{inv.email || "—"}</td>
                   <td className="px-5 py-3 text-sm text-muted-foreground">{inv.phone || "—"}</td>
+                  <td className="px-5 py-3 text-center">
+                    {inv.portal_access ? (
+                      <span className="inline-flex items-center gap-1 text-xs font-medium text-emerald-600">
+                        <span className="h-2 w-2 rounded-full bg-emerald-500" /> Active
+                      </span>
+                    ) : (
+                      <span className="inline-flex items-center gap-1 text-xs text-muted-foreground">
+                        <span className="h-2 w-2 rounded-full bg-gray-300" /> —
+                      </span>
+                    )}
+                  </td>
                   <td className="px-5 py-3 text-right text-sm font-mono font-semibold">{inv.ownership_percentage.toFixed(1)}%</td>
                   <td className="px-5 py-3 text-right">
                     <div className="flex items-center justify-end gap-2">
