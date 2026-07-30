@@ -38,7 +38,7 @@ export default function DashboardLayout({ children }: { children: React.ReactNod
 
       {/* Sidebar: fixed on desktop, drawer on mobile */}
       <div className={`fixed inset-y-0 left-0 z-50 w-[240px] transform transition-transform duration-200 lg:static lg:translate-x-0 ${sidebarOpen ? "translate-x-0" : "-translate-x-full lg:translate-x-0"}`}>
-        <Sidebar userName={user?.name} userEmail={user?.email} onClose={() => setSidebarOpen(false)} />
+        <Sidebar userName={user?.name} userEmail={user?.email} role={user?.role} onClose={() => setSidebarOpen(false)} />
       </div>
 
       {/* Main content */}

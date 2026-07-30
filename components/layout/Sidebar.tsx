@@ -53,10 +53,18 @@ import { useRouter } from "next/navigation";
 interface SidebarProps {
   userName?: string;
   userEmail?: string;
+  role?: string;
   onClose?: () => void;
 }
 
-export function Sidebar({ userName, userEmail, onClose }: SidebarProps) {
+const INVESTOR_NAV_SECTIONS = [
+  { label: "Main", items: ["Dashboard", "Properties"] },
+  { label: "Reports", items: ["Documents", "Reports"] },
+  { label: "Account", items: ["Settings"] },
+];
+
+export function Sidebar({ userName, userEmail, role, onClose }: SidebarProps) {
+  const navSections = role === "investor" ? INVESTOR_NAV_SECTIONS : NAV_SECTIONS;
   const { logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
@@ -88,7 +96,7 @@ export function Sidebar({ userName, userEmail, onClose }: SidebarProps) {
 
       {/* Navigation */}
       <nav className="flex-1 overflow-y-auto px-3 py-4">
-        {NAV_SECTIONS.map((section) => (
+        {navSections.map((section) => (
           <div key={section.label} className="mb-4">
             <p className="mb-2 px-2 text-[11px] font-semibold uppercase tracking-wider text-white/30">
               {section.label}

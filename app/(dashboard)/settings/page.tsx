@@ -3,9 +3,12 @@
 import { useRef, useState } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth/useAuth";
-import { User, Lock, Bell, Sun, Moon, Check, Loader2, Upload, Camera } from "lucide-react";
+import { User, Lock, Bell, Sun, Moon, Check, Loader2, Upload, Camera, Users, X, Pencil, Trash2, KeyRound } from "lucide-react";
+import { useInvestors, useCreateInvestor, useUpdateInvestor, useResetInvestorPassword, useDeleteInvestor } from "@/lib/hooks/useAdmin";
+import { useProperties } from "@/lib/hooks/useProperties";
+import { LoadingState } from "@/components/shared/LoadingState";
 
-type Tab = "profile" | "security" | "notifications" | "appearance";
+type Tab = "profile" | "security" | "notifications" | "appearance" | "investors";
 
 export default function SettingsPage() {
   const { user } = useAuth();
@@ -17,6 +20,7 @@ export default function SettingsPage() {
     { id: "security", label: "Password & Security", icon: <Lock className="h-4 w-4" /> },
     { id: "notifications", label: "Notifications", icon: <Bell className="h-4 w-4" /> },
     { id: "appearance", label: "Appearance", icon: <Sun className="h-4 w-4" /> },
+    ...(user?.role === "admin" ? [{ id: "investors" as Tab, label: "Investors", icon: <Users className="h-4 w-4" /> }] : []),
   ];
 
   return (
@@ -51,6 +55,7 @@ export default function SettingsPage() {
           {activeTab === "security" && <SecurityTab />}
           {activeTab === "notifications" && <NotificationsTab />}
           {activeTab === "appearance" && <AppearanceTab theme={theme} setTheme={setTheme} />}
+          {activeTab === "investors" && <InvestorsTab />}
         </div>
       </div>
     </div>
@@ -303,6 +308,315 @@ function AppearanceTab({ theme, setTheme }: { theme?: string; setTheme: (t: stri
             <p className="text-xs text-[#8b8fa3] mt-0.5">Easy on the eyes</p>
           </div>
         </button>
+      </div>
+    </div>
+  );
+}
+
+/* ─── Investors Tab (admin only) ─── */
+function InvestorsTab() {
+  const { data: investors, isLoading } = useInvestors();
+  const { data: properties } = useProperties();
+  const createInvestor = useCreateInvestor();
+  const updateInvestor = useUpdateInvestor();
+  const resetPassword = useResetInvestorPassword();
+  const deleteInvestor = useDeleteInvestor();
+
+  const [showAddForm, setShowAddForm] = useState(false);
+  const [editingId, setEditingId] = useState<string | null>(null);
+  const [tempPassword, setTempPassword] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
+
+  // Add form state
+  const [newName, setNewName] = useState("");
+  const [newEmail, setNewEmail] = useState("");
+  const [newPropertyIds, setNewPropertyIds] = useState<string[]>([]);
+
+  // Edit form state
+  const [editName, setEditName] = useState("");
+  const [editPropertyIds, setEditPropertyIds] = useState<string[]>([]);
+
+  const handleToggleNewProperty = (propId: string) => {
+    setNewPropertyIds((prev) =>
+      prev.includes(propId) ? prev.filter((id) => id !== propId) : [...prev, propId]
+    );
+  };
+
+  const handleToggleEditProperty = (propId: string) => {
+    setEditPropertyIds((prev) =>
+      prev.includes(propId) ? prev.filter((id) => id !== propId) : [...prev, propId]
+    );
+  };
+
+  const handleAdd = async () => {
+    try {
+      const result = await createInvestor.mutateAsync({
+        name: newName,
+        email: newEmail,
+        property_ids: newPropertyIds,
+      });
+      setTempPassword(result.temp_password ?? null);
+      setShowAddForm(false);
+      setNewName("");
+      setNewEmail("");
+      setNewPropertyIds([]);
+    } catch {
+      // error handled by query client
+    }
+  };
+
+  const handleEdit = async (id: string) => {
+    try {
+      await updateInvestor.mutateAsync({
+        id,
+        data: { name: editName, property_ids: editPropertyIds },
+      });
+      setEditingId(null);
+    } catch {
+      // error handled by query client
+    }
+  };
+
+  const handleResetPassword = async (id: string) => {
+    try {
+      const result = await resetPassword.mutateAsync(id);
+      setTempPassword(result.temp_password ?? null);
+    } catch {
+      // error handled by query client
+    }
+  };
+
+  const handleDelete = async (id: string) => {
+    try {
+      await deleteInvestor.mutateAsync(id);
+      setConfirmDelete(null);
+    } catch {
+      // error handled by query client
+    }
+  };
+
+  const startEditing = (investor: { id: string; name: string; property_ids: string[] }) => {
+    setEditingId(investor.id);
+    setEditName(investor.name);
+    setEditPropertyIds(investor.property_ids);
+  };
+
+  if (isLoading) {
+    return <LoadingState text="Loading investors..." />;
+  }
+
+  return (
+    <div className="space-y-5">
+      {/* Header */}
+      <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6">
+        <div className="flex items-center justify-between">
+          <div>
+            <h2 className="text-base font-semibold text-[#1a1d2b]">Investors</h2>
+            <p className="text-xs text-[#8b8fa3] mt-0.5">Manage investor accounts and property assignments</p>
+          </div>
+          <button
+            onClick={() => { setShowAddForm(!showAddForm); setEditingId(null); }}
+            className="rounded-lg bg-[#1a1d2b] px-4 py-2 text-xs font-semibold text-white hover:bg-black transition-colors"
+          >
+            {showAddForm ? "Cancel" : "Add Investor"}
+          </button>
+        </div>
+      </div>
+
+      {/* Temp password banner */}
+      {tempPassword && (
+        <div className="bg-amber-50 border border-amber-200 rounded-xl p-4 flex items-center justify-between">
+          <div className="flex items-center gap-3">
+            <KeyRound className="h-5 w-5 text-amber-600 shrink-0" />
+            <div>
+              <p className="text-sm font-semibold text-amber-800">Temporary Password</p>
+              <p className="text-sm font-mono font-bold text-amber-900 mt-0.5">{tempPassword}</p>
+              <p className="text-xs text-amber-700 mt-0.5">Share this with the investor. It will not be shown again.</p>
+            </div>
+          </div>
+          <button onClick={() => setTempPassword(null)} className="text-amber-500 hover:text-amber-700 transition-colors">
+            <X className="h-5 w-5" />
+          </button>
+        </div>
+      )}
+
+      {/* Add form */}
+      {showAddForm && (
+        <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-[#1a1d2b]">New Investor</h3>
+          <div className="grid grid-cols-2 gap-4">
+            <div>
+              <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Name</label>
+              <input
+                type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
+                className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20"
+                placeholder="Full name"
+              />
+            </div>
+            <div>
+              <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Email</label>
+              <input
+                type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
+                className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20"
+                placeholder="investor@example.com"
+              />
+            </div>
+          </div>
+          <div>
+            <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Property Access</label>
+            <div className="max-h-40 overflow-y-auto border border-[#e8eaed] rounded-lg p-3 space-y-2">
+              {properties && properties.length > 0 ? (
+                properties.map((prop) => (
+                  <label key={prop.id} className="flex items-center gap-2.5 cursor-pointer">
+                    <input
+                      type="checkbox"
+                      checked={newPropertyIds.includes(prop.id)}
+                      onChange={() => handleToggleNewProperty(prop.id)}
+                      className="h-4 w-4 rounded border-gray-300 text-[#3b82f6] focus:ring-[#3b82f6]/20"
+                    />
+                    <span className="text-sm text-[#1a1d2b]">{prop.name}</span>
+                  </label>
+                ))
+              ) : (
+                <p className="text-sm text-[#8b8fa3]">No properties available</p>
+              )}
+            </div>
+          </div>
+          <button
+            onClick={handleAdd}
+            disabled={!newName || !newEmail || createInvestor.isPending}
+            className="rounded-lg bg-[#1a1d2b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-2"
+          >
+            {createInvestor.isPending ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
+            Create Investor
+          </button>
+        </div>
+      )}
+
+      {/* Investors list */}
+      <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm">
+        {investors && investors.length > 0 ? (
+          <div className="divide-y divide-[#e8eaed]">
+            {investors.map((investor) => (
+              <div key={investor.id} className="p-5">
+                {editingId === investor.id ? (
+                  /* ── Inline Edit Form ── */
+                  <div className="space-y-4">
+                    <div className="grid grid-cols-2 gap-4">
+                      <div>
+                        <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Name</label>
+                        <input
+                          type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
+                          className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20"
+                        />
+                      </div>
+                      <div>
+                        <label className="block text-xs font-semibold text-[#8b8fa3] mb-1.5">Email</label>
+                        <p className="text-sm font-medium text-[#1a1d2b] py-2.5">{investor.email}</p>
+                      </div>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Property Access</label>
+                      <div className="max-h-32 overflow-y-auto border border-[#e8eaed] rounded-lg p-3 space-y-2">
+                        {properties && properties.length > 0 ? (
+                          properties.map((prop) => (
+                            <label key={prop.id} className="flex items-center gap-2.5 cursor-pointer">
+                              <input
+                                type="checkbox"
+                                checked={editPropertyIds.includes(prop.id)}
+                                onChange={() => handleToggleEditProperty(prop.id)}
+                                className="h-4 w-4 rounded border-gray-300 text-[#3b82f6] focus:ring-[#3b82f6]/20"
+                              />
+                              <span className="text-sm text-[#1a1d2b]">{prop.name}</span>
+                            </label>
+                          ))
+                        ) : (
+                          <p className="text-sm text-[#8b8fa3]">No properties available</p>
+                        )}
+                      </div>
+                    </div>
+                    <div className="flex items-center gap-2">
+                      <button
+                        onClick={() => handleEdit(investor.id)}
+                        disabled={updateInvestor.isPending}
+                        className="rounded-lg bg-[#1a1d2b] px-4 py-2 text-xs font-semibold text-white hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-1.5"
+                      >
+                        {updateInvestor.isPending ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Check className="h-3.5 w-3.5" />}
+                        Save
+                      </button>
+                      <button
+                        onClick={() => setEditingId(null)}
+                        className="rounded-lg border border-[#e8eaed] px-4 py-2 text-xs font-medium text-[#8b8fa3] hover:bg-gray-50 transition-colors"
+                      >
+                        Cancel
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  /* ── Investor Row ── */
+                  <div className="flex items-center justify-between">
+                    <div className="flex-1 min-w-0">
+                      <p className="text-sm font-semibold text-[#1a1d2b]">{investor.name}</p>
+                      <p className="text-xs text-[#8b8fa3] mt-0.5">{investor.email}</p>
+                      <p className="text-xs text-[#8b8fa3] mt-0.5">
+                        {investor.property_ids.length} property{investor.property_ids.length !== 1 ? "ies" : "y"}
+                        {investor.property_ids.length > 0 ? ` assigned` : ``}
+                      </p>
+                    </div>
+                    <div className="flex items-center gap-1.5 shrink-0">
+                      <button
+                        onClick={() => startEditing(investor)}
+                        className="rounded-lg p-2 text-[#8b8fa3] hover:text-[#1a1d2b] hover:bg-gray-100 transition-colors"
+                        title="Edit"
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </button>
+                      <button
+                        onClick={() => handleResetPassword(investor.id)}
+                        disabled={resetPassword.isPending}
+                        className="rounded-lg p-2 text-[#8b8fa3] hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                        title="Reset Password"
+                      >
+                        <KeyRound className="h-4 w-4" />
+                      </button>
+                      {confirmDelete === investor.id ? (
+                        <div className="flex items-center gap-1.5">
+                          <button
+                            onClick={() => handleDelete(investor.id)}
+                            disabled={deleteInvestor.isPending}
+                            className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
+                          >
+                            {deleteInvestor.isPending ? "Deleting..." : "Confirm"}
+                          </button>
+                          <button
+                            onClick={() => setConfirmDelete(null)}
+                            className="rounded-lg border border-[#e8eaed] px-3 py-2 text-xs font-medium text-[#8b8fa3] hover:bg-gray-50 transition-colors"
+                          >
+                            Cancel
+                          </button>
+                        </div>
+                      ) : (
+                        <button
+                          onClick={() => setConfirmDelete(investor.id)}
+                          className="rounded-lg p-2 text-[#8b8fa3] hover:text-red-600 hover:bg-red-50 transition-colors"
+                          title="Remove"
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        ) : (
+          <div className="p-10 text-center">
+            <Users className="h-10 w-10 text-[#8b8fa3] mx-auto mb-3" />
+            <p className="text-sm font-medium text-[#1a1d2b]">No investors yet</p>
+            <p className="text-xs text-[#8b8fa3] mt-1">Click &quot;Add Investor&quot; to create the first one.</p>
+          </div>
+        )}
       </div>
     </div>
   );
