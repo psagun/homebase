@@ -1,0 +1,21 @@
+property_name,transaction_type,category,amount,transaction_date,description
+Sunrise Apartments,income,Rent,$15,000,2026-07-01,Monthly rent collected from all units
+Sunrise Apartments,expense,Mortgage,$8,200,2026-07-15,Commercial mortgage payment
+Sunrise Apartments,expense,Insurance,$2,100,2026-07-01,Monthly insurance premium
+Pine Ridge Estates,income,Rent,3800,2026-07-01,Rent from tenant
+Pine Ridge Estates,expense,Mortgage,1616,2026-07-15,Wells Fargo mortgage autopay
+Bay View Plaza,income,Rent,28500,2026-07-01,Quarterly rent from anchor tenant
+Bay View Plaza,expense,Property Management,2200,2026-07-01,Management fee - 8%
+Harbor Side Condo,income,Rent,3200,2026-07-01,Monthly rent collected
+Harbor Side Condo,expense,HOA,450,2026-07-01,Monthly HOA dues
+Riverside Retail,income,Rent,8500,2026-07-01,Rent from Bella's Bakery
+Riverside Retail,expense,Utilities,1250,2026-07-15,Water and electric
+Maple Grove Duplex,income,Rent,2200,2026-07-01,Unit A - rent
+Maple Grove Duplex,income,Rent,2100,2026-07-01,Unit B - rent
+Maple Grove Duplex,expense,Maintenance,680,2026-07-10,Snow removal contract
+Maple Grove Duplex,expense,Property Tax,4200,2026-11-01,Annual property tax
+Sunrise Apartments,expense,Maintenance,3500,2026-07-20,Elevator inspection and repair
+Pine Ridge Estates,expense,Utilities,350,2026-07-05,Gas and electric
+Bay View Plaza,expense,Taxes,18500,2026-11-01,Annual commercial property tax
+Harbor Side Condo,expense,Insurance,175,2026-07-01,Monthly condo insurance
+Riverside Retail,expense,Maintenance,1200,2026-07-18,Storefront awning repair

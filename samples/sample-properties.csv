@@ -1,0 +1,11 @@
+name,address_line_1,city,state,postal_code,property_type,status,purchase_price,current_value,bedrooms,bathrooms,year_built,purchase_date,lot_size,notes
+Sunrise Apartments,100 Park Avenue,New York,NY,10001,Multi-Family,Occupied,1800000,2100000,12,8,2015,2020-06-01,0.35,Premier multifamily property in Manhattan
+Pine Ridge Estates,500 Mountain Rd,Denver,CO,80201,Single Family,Occupied,520000,585000,4,3,2019,2021-03-15,0.5,Modern mountain home with panoramic views
+Bay View Plaza,2000 Harbor Blvd,San Francisco,CA,94101,Commercial,Occupied,3200000,3750000,0,0,2010,2018-09-01,0.12,Premium office space with bay views
+Cedar Creek Land,1500 Forest Lane,Portland,OR,97201,Land,Vacant,125000,145000,0,0,0,,5.2,Prime development land zoned for residential
+Harbor Side Condo,88 Water Street #2204,Chicago,IL,60601,Condo,Occupied,385000,410000,2,2,2022,2023-01-15,0,Waterfront condo with lake views
+Riverside Retail,450 River Road,Nashville,TN,37201,Commercial,Occupied,890000,950000,0,0,2016,2019-11-01,0.08,Prime retail space on busy corridor
+The Hamptons Villas,10 Coastal Highway,Southampton,NY,11968,Townhouse,For Sale,750000,795000,3,2.5,2020,2022-05-01,0.04,Elevated townhouse near beach access
+Westside Warehouses,300 Industrial Pkwy,Phoenix,AZ,85001,Commercial,Vacant,1100000,1200000,0,0,2008,2021-07-01,1.8,Two warehouses with climate-controlled storage
+Maple Grove Duplex,75 Maple Street,Portland,ME,04101,Multi-Family,Occupied,440000,475000,4,2,1985,2017-10-01,0.15,Classic New England duplex fully leased
+Tech Park Units,250 Innovation Drive,Austin,TX,78701,Commercial,Under Maintenance,2200000,2350000,0,0,2021,2023-03-01,0.25,Modern tech office park with 3 buildings
