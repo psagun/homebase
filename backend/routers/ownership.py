@@ -27,6 +27,19 @@ from backend.schemas.ownership import (
 router = APIRouter(tags=["ownership"])
 
 
+@router.get("/ownership-entities/{entity_id}/ping")
+def ping_check(entity_id: uuid.UUID, db: Session = Depends(get_db)):
+    """Diagnostic endpoint to check investor table."""
+    from backend.models.investor import Investor
+    from backend.models.ownership_entity_investor import OwnershipEntityInvestor
+    try:
+        count = db.query(Investor).count()
+        link_count = db.query(OwnershipEntityInvestor).count()
+        return {"investor_count": count, "link_count": link_count}
+    except Exception as e:
+        return {"error": str(e)}
+
+
 def _get_property(user_id: uuid.UUID, property_id: uuid.UUID, db: Session) -> Property:
     prop = db.query(Property).filter(
         Property.id == property_id,
