@@ -16,6 +16,7 @@ from backend.routers.notifications import router as notifications_router
 from backend.routers.recently_viewed import router as recently_viewed_router
 from backend.routers.reports import router as reports_router
 from backend.routers.ownership import router as ownership_router
+from backend.routers.csv_import import router as csv_import_router
 from backend.routers.seed import router as seed_router
 from backend.routers.admin import router as admin_router
 
@@ -36,5 +37,6 @@ api_router.include_router(dashboard_router, prefix="/dashboard", tags=["dashboar
 api_router.include_router(recently_viewed_router, prefix="/recently-viewed", tags=["recently-viewed"])
 api_router.include_router(reports_router, tags=["reports"])
 api_router.include_router(ownership_router, tags=["ownership"])
+api_router.include_router(csv_import_router, tags=["import"])
 api_router.include_router(seed_router, prefix="/seed", tags=["seed"])
 api_router.include_router(admin_router, prefix="/admin", tags=["admin"])

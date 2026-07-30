@@ -6,7 +6,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
-import { DollarSign, ArrowUpRight, ArrowDownRight } from "lucide-react";
+import { DollarSign, ArrowUpRight, ArrowDownRight, Upload } from "lucide-react";
 
 interface TransactionItem {
   id: string; property_id: string; property_name: string; user_name: string;
@@ -18,6 +18,32 @@ export default function TransactionsPage() {
   const [txns, setTxns] = useState<TransactionItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState(false);
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
+
+  const handleImport = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".csv";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setImporting(true);
+      setImportResult(null);
+      try {
+        const { importTransactionsCSV } = await import("@/lib/api/csvImport");
+        const result = await importTransactionsCSV(file);
+        setImportResult(`Imported ${result.imported} transactions${result.skipped > 0 ? `, ${result.skipped} skipped` : ""}.`);
+        // Refresh
+        const resp = await fetch("/api/v1/all", { credentials: "include" });
+        if (resp.ok) setTxns(await resp.json());
+      } catch (err: unknown) {
+        setImportResult(`Error: ${err instanceof Error ? err.message : "Import failed"}`);
+      }
+      setImporting(false);
+    };
+    input.click();
+  };
 
   useEffect(() => {
     fetch("/api/v1/all", { credentials: "include" })
@@ -37,7 +63,18 @@ export default function TransactionsPage() {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <div><h1 className="text-2xl font-bold tracking-tight">Transactions</h1><p className="text-sm text-muted-foreground mt-1">All financial activity across your portfolio</p></div>
+        <button onClick={handleImport} disabled={importing}
+          className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+          <Upload className="h-4 w-4" />
+          {importing ? "Importing..." : "Import CSV"}
+        </button>
       </div>
+
+      {importResult && (
+        <div className={`rounded-lg px-4 py-3 text-sm ${importResult.startsWith("Error") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+          {importResult}
+        </div>
+      )}
 
       {/* Summary */}
       <div className="grid grid-cols-2 md:grid-cols-3 gap-4">

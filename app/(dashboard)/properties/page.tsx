@@ -2,7 +2,7 @@
 
 import { useState } from "react";
 import Link from "next/link";
-import { Plus, Search } from "lucide-react";
+import { Plus, Search, Upload } from "lucide-react";
 import { useProperties } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -15,11 +15,35 @@ export default function PropertiesPage() {
   const [search, setSearch] = useState("");
   const [statusFilter, setStatusFilter] = useState("");
   const [typeFilter, setTypeFilter] = useState("");
+  const [importResult, setImportResult] = useState<string | null>(null);
+  const [importing, setImporting] = useState(false);
   const { data: properties, isLoading, isError, refetch } = useProperties({
     search: search || undefined,
     status: statusFilter || undefined,
     property_type: typeFilter || undefined,
   });
+
+  const handleImport = async () => {
+    const input = document.createElement("input");
+    input.type = "file";
+    input.accept = ".csv";
+    input.onchange = async () => {
+      const file = input.files?.[0];
+      if (!file) return;
+      setImporting(true);
+      setImportResult(null);
+      try {
+        const { importPropertiesCSV } = await import("@/lib/api/csvImport");
+        const result = await importPropertiesCSV(file);
+        setImportResult(`Imported ${result.imported} properties${result.skipped > 0 ? `, ${result.skipped} skipped` : ""}.`);
+        refetch();
+      } catch (err: unknown) {
+        setImportResult(`Error: ${err instanceof Error ? err.message : "Import failed"}`);
+      }
+      setImporting(false);
+    };
+    input.click();
+  };
 
   return (
     <div className="space-y-6">
@@ -30,14 +54,27 @@ export default function PropertiesPage() {
             Manage your real estate portfolio
           </p>
         </div>
-        <Link
-          href="/properties/new"
-          className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
-        >
-          <Plus className="h-4 w-4" />
-          Add Property
-        </Link>
+        <div className="flex items-center gap-3">
+          <button onClick={handleImport} disabled={importing}
+            className="flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+            <Upload className="h-4 w-4" />
+            {importing ? "Importing..." : "Import CSV"}
+          </button>
+          <Link
+            href="/properties/new"
+            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90 transition-colors"
+          >
+            <Plus className="h-4 w-4" />
+            Add Property
+          </Link>
+        </div>
       </div>
+
+      {importResult && (
+        <div className={`rounded-lg px-4 py-3 text-sm ${importResult.startsWith("Error") ? "bg-red-50 text-red-700" : "bg-emerald-50 text-emerald-700"}`}>
+          {importResult}
+        </div>
+      )}
 
       {/* Search & Filters */}
       <div className="flex flex-wrap gap-3">
