@@ -27,19 +27,6 @@ from backend.schemas.ownership import (
 router = APIRouter(tags=["ownership"])
 
 
-@router.get("/ownership-entities/{entity_id}/ping")
-def ping_check(entity_id: uuid.UUID, db: Session = Depends(get_db)):
-    """Diagnostic endpoint to check investor table."""
-    from backend.models.investor import Investor
-    from backend.models.ownership_entity_investor import OwnershipEntityInvestor
-    try:
-        count = db.query(Investor).count()
-        link_count = db.query(OwnershipEntityInvestor).count()
-        return {"investor_count": count, "link_count": link_count}
-    except Exception as e:
-        return {"error": str(e)}
-
-
 def _get_property(user_id: uuid.UUID, property_id: uuid.UUID, db: Session) -> Property:
     prop = db.query(Property).filter(
         Property.id == property_id,
@@ -177,16 +164,26 @@ def add_entity_investor(
         )
 
     # Create or reuse investor
+    from decimal import Decimal
     inv_id = uuid.uuid4()
-    db.execute(
-        "INSERT INTO investors (id, name, email, phone) VALUES (?, ?, ?, ?)",
-        (str(inv_id), data.name, data.email, data.phone),
-    )
-    db.execute(
-        "INSERT INTO ownership_entity_investors (ownership_entity_id, investor_id, ownership_percentage) VALUES (?, ?, ?)",
-        (str(entity_id), str(inv_id), float(data.ownership_percentage)),
-    )
-    db.commit()
+    try:
+        stmt = OwnershipEntityInvestor.__table__.insert()
+        db.execute(
+            Investor.__table__.insert(),
+            {"id": inv_id, "name": data.name, "email": data.email, "phone": data.phone},
+        )
+        db.execute(
+            OwnershipEntityInvestor.__table__.insert(),
+            {
+                "ownership_entity_id": entity_id,
+                "investor_id": inv_id,
+                "ownership_percentage": Decimal(str(data.ownership_percentage)),
+            },
+        )
+        db.commit()
+    except Exception as e:
+        db.rollback()
+        return {"error": str(e), "type": type(e).__name__}
 
     return {
         "id": str(inv_id),
