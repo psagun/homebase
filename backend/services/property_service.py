@@ -8,6 +8,7 @@ from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
 from backend.models.property import Property, PropertyStatus, PropertyType
+from backend.models.property_investor import PropertyInvestor
 
 
 def _parse_enum(enum_class, value: str):
@@ -85,13 +86,29 @@ def create_property(db: Session, user_id, data) -> Property:
     return prop
 
 
-def get_property(db: Session, user_id, property_id) -> Property:
-    """Get a single property, verifying ownership."""
-    prop = db.query(Property).filter(
-        Property.id == property_id,
-        Property.user_id == user_id,
-        Property.archived_at.is_(None),
-    ).first()
+def get_property(db: Session, user_id, property_id, user_role: str = "admin") -> Property:
+    """Get a single property, verifying ownership or investor assignment."""
+    if user_role == "investor":
+        prop = (
+            db.query(Property)
+            .join(PropertyInvestor)
+            .filter(
+                Property.id == property_id,
+                PropertyInvestor.user_id == user_id,
+                Property.archived_at.is_(None),
+            )
+            .first()
+        )
+    else:
+        prop = (
+            db.query(Property)
+            .filter(
+                Property.id == property_id,
+                Property.user_id == user_id,
+                Property.archived_at.is_(None),
+            )
+            .first()
+        )
 
     if not prop:
         raise HTTPException(

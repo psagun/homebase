@@ -47,7 +47,7 @@ def get_property(
     db: Session = Depends(get_db),
 ):
     """Get a single property by ID."""
-    return property_service.get_property(db, current_user.id, property_id)
+    return property_service.get_property(db, current_user.id, property_id, current_user.role)
 
 
 @router.patch("/{property_id}", response_model=PropertyResponse)
