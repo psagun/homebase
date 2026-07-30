@@ -68,5 +68,9 @@ class Property(Base):
         onupdate=lambda: datetime.now(timezone.utc),
     )
 
+    # Ownership
+    ownership_entity_id = Column(UUID(as_uuid=True), ForeignKey("ownership_entities.id"), nullable=True, index=True)
+
     # Relationships
     user = relationship("User", back_populates="properties")
+    ownership_entity = relationship("OwnershipEntity", backref="properties")

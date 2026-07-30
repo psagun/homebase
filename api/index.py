@@ -27,7 +27,7 @@ def _migrate_add_column(engine, table, column, coltype):
 
 from backend.database import Base, engine  # noqa: E402
 from sqlalchemy import text  # noqa: E402
-from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed, PropertyInvestor  # noqa: E402, F401
+from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed, PropertyInvestor, OwnershipEntity, Investor, OwnershipEntityInvestor  # noqa: E402, F401
 
 Base.metadata.create_all(bind=engine)
 
@@ -37,3 +37,4 @@ _migrate_add_column(engine, "users", "role", "VARCHAR(20)")
 with engine.connect() as conn:
     conn.execute(text("UPDATE users SET role = 'admin' WHERE role IS NULL"))
     conn.commit()
+_migrate_add_column(engine, "properties", "ownership_entity_id", "UUID")
