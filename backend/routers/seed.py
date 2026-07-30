@@ -934,12 +934,22 @@ def seed_database(key: str = Query(..., description="Seed secret key from CRON_S
     try:
         existing_user = db.query(User).filter(User.email == DEMO_EMAIL).first()
 
+        # Always seed ownership data (idempotent — skips if entities exist)
+        ownership_count = db.query(OwnershipEntity).count()
+        if ownership_count == 0:
+            props = {p.name: p for p in db.query(Property).filter(
+                Property.user_id == (existing_user.id if existing_user else uuid.uuid4())
+            ).all()}
+            if props:
+                _make_ownership(db, uuid.uuid4(), props)
+                db.commit()
+
         # Check if already fully seeded (tasks exist)
         task_count = db.query(Task).count()
         if task_count > 0:
             return {
-                "status": "skipped",
-                "message": "Database already fully seeded.",
+                "status": "ok",
+                "message": "Database already seeded. Ownership data refreshed if missing.",
                 "demo_email": DEMO_EMAIL,
                 "demo_password": DEMO_PASSWORD,
             }
