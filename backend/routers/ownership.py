@@ -166,19 +166,15 @@ def add_entity_investor(
     # Create or reuse investor
     from decimal import Decimal
     inv_id = uuid.uuid4()
+    from sqlalchemy import text
     try:
-        stmt = OwnershipEntityInvestor.__table__.insert()
         db.execute(
-            Investor.__table__.insert(),
+            text("INSERT INTO investors (id, name, email, phone) VALUES (:id, :name, :email, :phone)"),
             {"id": inv_id, "name": data.name, "email": data.email, "phone": data.phone},
         )
         db.execute(
-            OwnershipEntityInvestor.__table__.insert(),
-            {
-                "ownership_entity_id": entity_id,
-                "investor_id": inv_id,
-                "ownership_percentage": Decimal(str(data.ownership_percentage)),
-            },
+            text("INSERT INTO ownership_entity_investors (ownership_entity_id, investor_id, ownership_percentage) VALUES (:eid, :iid, :pct)"),
+            {"eid": entity_id, "iid": inv_id, "pct": Decimal(str(data.ownership_percentage))},
         )
         db.commit()
     except Exception as e:
