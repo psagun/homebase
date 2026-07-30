@@ -40,6 +40,7 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
     await setEntity.mutateAsync(selectedEntityId);
     setShowEntitySelector(false);
     setSelectedEntityId("");
+    refetch();
   };
 
   const handleCreateAndAssign = async () => {
@@ -48,11 +49,13 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
     await setEntity.mutateAsync(entity.id);
     setShowNewEntityForm(false);
     setNewEntityName("");
+    refetch();
   };
 
   const handleRemoveEntity = async () => {
     if (confirm("Remove the ownership entity from this property? The entity will still exist for other properties.")) {
       await removeEntity.mutateAsync();
+      refetch();
     }
   };
 
@@ -179,7 +182,7 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
 
       {/* Entity Investors */}
       {!isIndividual && ownership?.entity && (
-        <InvestorsSection entityId={ownership.entity.id} investors={ownership.investors} />
+        <InvestorsSection entityId={ownership.entity.id} investors={ownership.investors} onUpdated={() => refetch()} />
       )}
 
       {/* Documents */}
@@ -205,9 +208,11 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
 function InvestorsSection({
   entityId,
   investors,
+  onUpdated,
 }: {
   entityId: string;
   investors: { id: string; name: string; email?: string | null; phone?: string | null; ownership_percentage: number }[];
+  onUpdated?: () => void;
 }) {
   const addInvestor = useAddEntityInvestor();
   const updateInvestor = useUpdateEntityInvestor();
@@ -237,6 +242,7 @@ function InvestorsSection({
         investorId: editId,
         data: { name: name || undefined, email: email || undefined, phone: phone || undefined, ownership_percentage: pctVal },
       });
+      onUpdated?.();
     } else {
       if (pctVal > remainingPct) {
         alert(`Total ownership would exceed 100%. Remaining: ${remainingPct}%`);
@@ -246,6 +252,7 @@ function InvestorsSection({
         entityId,
         data: { name, email: email || undefined, phone: phone || undefined, ownership_percentage: pctVal },
       });
+      onUpdated?.();
     }
     resetForm();
   };
@@ -346,6 +353,7 @@ function InvestorsSection({
                       <button onClick={async () => {
                         if (confirm(`Remove ${inv.name} from this entity?`)) {
                           await removeInvestor.mutateAsync({ entityId, investorId: inv.id });
+                          onUpdated?.();
                         }
                       }}
                         className="text-xs text-red-600 hover:underline">Remove</button>
