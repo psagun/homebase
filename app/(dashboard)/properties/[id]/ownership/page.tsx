@@ -232,29 +232,36 @@ function InvestorsSection({
     setName(""); setEmail(""); setPhone(""); setPct(""); setEditId(null); setShowForm(false);
   };
 
+  const [error, setError] = useState<string | null>(null);
+
   const handleSubmit = async () => {
     const pctVal = parseFloat(pct);
-    if (isNaN(pctVal) || pctVal <= 0) return;
+    if (isNaN(pctVal) || pctVal <= 0) { setError("Ownership percentage must be greater than 0"); return; }
 
-    if (editId) {
-      await updateInvestor.mutateAsync({
-        entityId,
-        investorId: editId,
-        data: { name: name || undefined, email: email || undefined, phone: phone || undefined, ownership_percentage: pctVal },
-      });
-      onUpdated?.();
-    } else {
-      if (pctVal > remainingPct) {
-        alert(`Total ownership would exceed 100%. Remaining: ${remainingPct}%`);
-        return;
+    setError(null);
+    try {
+      if (editId) {
+        await updateInvestor.mutateAsync({
+          entityId,
+          investorId: editId,
+          data: { name: name || undefined, email: email || undefined, phone: phone || undefined, ownership_percentage: pctVal },
+        });
+        onUpdated?.();
+      } else {
+        if (pctVal > remainingPct) {
+          setError(`Total ownership would exceed 100%. Remaining: ${remainingPct}%`);
+          return;
+        }
+        await addInvestor.mutateAsync({
+          entityId,
+          data: { name, email: email || undefined, phone: phone || undefined, ownership_percentage: pctVal },
+        });
+        onUpdated?.();
       }
-      await addInvestor.mutateAsync({
-        entityId,
-        data: { name, email: email || undefined, phone: phone || undefined, ownership_percentage: pctVal },
-      });
-      onUpdated?.();
+      resetForm();
+    } catch (err: unknown) {
+      setError(err instanceof Error ? err.message : "Failed to save investor");
     }
-    resetForm();
   };
 
   const handleEdit = (inv: typeof investors[0]) => {
@@ -283,6 +290,9 @@ function InvestorsSection({
       {/* Add/Edit Form */}
       {showForm && (
         <div className="border-b bg-muted/20 px-5 py-4 space-y-3">
+          {error && (
+            <div className="rounded-md bg-red-50 px-4 py-2.5 text-sm text-red-700">{error}</div>
+          )}
           <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-5 gap-3">
             <div>
               <label className="block text-xs font-medium mb-1">Name *</label>
@@ -301,7 +311,7 @@ function InvestorsSection({
             </div>
             <div>
               <label className="block text-xs font-medium mb-1">Ownership % *</label>
-              <input type="number" step="0.01" min="0" max={remainingPct} value={pct}
+              <input type="number" step="0.01" min="0" max={editId ? 100 : remainingPct} value={pct}
                 onChange={(e) => setPct(e.target.value)}
                 className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
             </div>
