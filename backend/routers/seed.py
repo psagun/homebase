@@ -17,6 +17,9 @@ from backend.models.task import Task, TaskPriority, TaskStatus, TaskType
 from backend.models.tenant import Tenant
 from backend.models.transaction import Transaction, TransactionCategory, TransactionType
 from backend.models.user import User
+from backend.models.ownership_entity import OwnershipEntity
+from backend.models.investor import Investor
+from backend.models.ownership_entity_investor import OwnershipEntityInvestor
 
 router = APIRouter()
 
@@ -840,6 +843,85 @@ def _make_maintenance(db, uid, props):
     db.flush()
 
 
+def _make_ownership(db, uid, props):
+    """Create ownership entities and assign to properties."""
+    # Entity 1: TY Investments LLC — owns multiple properties
+    ty_investments = OwnershipEntity(
+        name="TY Investments LLC",
+        entity_type="LLC",
+        ein="XX-XXXXXXX",
+        state_of_formation="Delaware",
+        status="Active",
+    )
+    ty_investments.id = uuid.uuid4()
+    db.add(ty_investments)
+    db.flush()
+
+    # Entity 2: Sunset Holdings LLC
+    sunset_holdings = OwnershipEntity(
+        name="Sunset Holdings LLC",
+        entity_type="LLC",
+        ein="XX-XXXXXXX",
+        state_of_formation="Florida",
+        status="Active",
+    )
+    sunset_holdings.id = uuid.uuid4()
+    db.add(sunset_holdings)
+    db.flush()
+
+    # Entity 3: Harbor View Trust
+    harbor_trust = OwnershipEntity(
+        name="Harbor View Trust",
+        entity_type="Trust",
+        ein="XX-XXXXXXX",
+        state_of_formation="California",
+        status="Active",
+    )
+    harbor_trust.id = uuid.uuid4()
+    db.add(harbor_trust)
+    db.flush()
+
+    # Investors for TY Investments
+    investors_data = [
+        ("Thomas Yang", "thomas.yang@email.com", "(302) 555-1001", ty_investments.id, 60.0),
+        ("Lisa Yang", "lisa.yang@email.com", "(302) 555-1002", ty_investments.id, 25.0),
+        ("Michael Chen", "michael.chen@email.com", "(302) 555-1003", ty_investments.id, 15.0),
+        ("Sarah Mitchell", "sarah.mitchell@email.com", "(305) 555-2001", sunset_holdings.id, 100.0),
+        ("Robert Garcia", "robert.garcia@email.com", "(415) 555-3001", harbor_trust.id, 50.0),
+        ("Jennifer Lopez", "jennifer.lopez@email.com", "(415) 555-3002", harbor_trust.id, 50.0),
+    ]
+
+    for name, email, phone, entity_id, pct in investors_data:
+        inv = Investor(name=name, email=email, phone=phone)
+        inv.id = uuid.uuid4()
+        db.add(inv)
+        db.flush()
+
+        link = OwnershipEntityInvestor(
+            ownership_entity_id=entity_id,
+            investor_id=inv.id,
+            ownership_percentage=pct,
+        )
+        db.add(link)
+
+    db.flush()
+
+    # Assign entities to properties
+    entity_assignments = [
+        ("Sunset Villa", sunset_holdings.id),
+        ("Downtown Office", ty_investments.id),
+        ("Harbor Loft", harbor_trust.id),
+        ("Oakwood Townhomes", ty_investments.id),
+        ("Main Street Retail", ty_investments.id),
+    ]
+    for pname, eid in entity_assignments:
+        prop = props.get(pname)
+        if prop:
+            prop.ownership_entity_id = eid
+
+    db.flush()
+
+
 @router.get("")
 def seed_database(key: str = Query(..., description="Seed secret key from CRON_SECRET")):
     """Seed the database with a full demo dataset."""
@@ -895,6 +977,7 @@ def seed_database(key: str = Query(..., description="Seed secret key from CRON_S
         _make_transactions(db, uid, props)
         _make_tasks(db, uid, props)
         _make_maintenance(db, uid, props)
+        _make_ownership(db, uid, props)
 
         db.commit()
 
@@ -905,7 +988,8 @@ def seed_database(key: str = Query(..., description="Seed secret key from CRON_S
                 f"5 mortgages, 10 insurance policies, "
                 f"19 contacts, 6 tenants, "
                 f"45+ transactions, 23 tasks, "
-                f"7 maintenance records."
+                f"7 maintenance records, "
+                f"3 ownership entities, 6 investors."
             ),
             "demo_email": DEMO_EMAIL,
             "demo_password": DEMO_PASSWORD,

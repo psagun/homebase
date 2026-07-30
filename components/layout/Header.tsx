@@ -16,7 +16,18 @@ interface HeaderProps { onMenuClick?: () => void; }
 export function Header({ onMenuClick }: HeaderProps) {
   const pathname = usePathname();
   const segments = pathname.split("/").filter(Boolean);
-  const title = segments.length > 0 ? capitalize(segments[segments.length - 1]!.replace(/-/g, " ")) : "Dashboard";
+
+  // Friendly title: if the last segment looks like a UUID, find a meaningful segment.
+  // For /properties/<uuid> → "Property Details", /properties/<uuid>/mortgage → "Mortgage", etc.
+  const raw = segments[segments.length - 1] || "";
+  const isUuid = /^[0-9a-f-]{36}$/i.test(raw) || /^[0-9a-f]{32}$/i.test(raw);
+  const title = isUuid
+    ? segments.length >= 4
+      ? capitalize(segments[segments.length - 2]!.replace(/-/g, " "))
+      : "Property Details"
+    : segments.length > 0
+      ? capitalize(raw.replace(/-/g, " "))
+      : "Dashboard";
   const [notifOpen, setNotifOpen] = useState(false);
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
