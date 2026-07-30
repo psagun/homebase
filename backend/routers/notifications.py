@@ -2,16 +2,41 @@
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
 from backend.models.insurance_policy import InsurancePolicy
 from backend.models.mortgage import Mortgage
 from backend.models.property import Property
+from backend.models.property_investor import PropertyInvestor
 from backend.models.task import Task, TaskStatus
 from backend.models.user import User
 
 router = APIRouter()
+
+
+def _get_visible_property_ids(db: Session, user: User) -> list:
+    """Get property IDs visible to this user based on role."""
+    if user.role == "investor":
+        rows = db.execute(
+            text("SELECT property_id FROM property_investors WHERE user_id = :uid"),
+            {"uid": user.id},
+        ).fetchall()
+        return [r[0] for r in rows]
+    else:
+        rows = db.execute(
+            text("SELECT id FROM properties WHERE user_id = :uid AND archived_at IS NULL"),
+            {"uid": user.id},
+        ).fetchall()
+        return [r[0] for r in rows]
+
+
+def _prop_name(db: Session, pid) -> str:
+    if not pid:
+        return ""
+    row = db.execute(text("SELECT name FROM properties WHERE id = :pid"), {"pid": pid}).first()
+    return f" — {row[0]}" if row else ""
 
 
 @router.post("/read")
@@ -31,118 +56,109 @@ def get_notifications(
 ):
     """Aggregate notifications from tasks, mortgages, and insurance."""
     today = date.today()
+    prop_ids = _get_visible_property_ids(db, current_user)
     notifications = []
 
+    if not prop_ids:
+        return {"notifications": [], "unread_count": 0}
+
+    # Helper: get property tasks by status(es)
+    def _tasks_by_status(statuses: list[str]) -> list:
+        return db.query(Task).filter(
+            Task.property_id.in_(prop_ids),
+            Task.user_id == current_user.id,
+            Task.status.in_(statuses),
+        ).all()
+
+    # Helper: get upcoming tasks
+    def _upcoming_tasks() -> list:
+        excluded = [TaskStatus.COMPLETED, TaskStatus.DISMISSED,
+                    TaskStatus.OVERDUE, TaskStatus.DUE_TODAY]
+        return db.query(Task).filter(
+            Task.property_id.in_(prop_ids),
+            Task.user_id == current_user.id,
+            Task.due_date >= today,
+            Task.due_date <= today + timedelta(days=7),
+            ~Task.status.in_(excluded),
+        ).all()
+
     # Overdue tasks
-    overdue_tasks = db.query(Task).filter(
-        Task.user_id == current_user.id,
-        Task.status == TaskStatus.OVERDUE,
-    ).all()
-    for t in overdue_tasks:
-        prop_name = ""
-        if t.property_id:
-            prop = db.query(Property).filter(Property.id == t.property_id).first()
-            prop_name = f" — {prop.name}" if prop else ""
+    for t in _tasks_by_status([TaskStatus.OVERDUE]):
         notifications.append({
             "id": f"task-overdue-{t.id}",
-            "title": f"Overdue: {t.title}{prop_name}",
-            "type": "task_overdue",
-            "severity": "error",
+            "title": f"Overdue: {t.title}{_prop_name(db, t.property_id)}",
+            "type": "task_overdue", "severity": "error",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
-            "read": False,
-            "date": str(t.due_date or ""),
+            "read": False, "date": str(t.due_date or ""),
         })
 
-    # Due today tasks
-    due_today = db.query(Task).filter(
-        Task.user_id == current_user.id,
-        Task.status == TaskStatus.DUE_TODAY,
-    ).all()
-    for t in due_today:
-        prop_name = ""
-        if t.property_id:
-            prop = db.query(Property).filter(Property.id == t.property_id).first()
-            prop_name = f" — {prop.name}" if prop else ""
+    # Due today
+    for t in _tasks_by_status([TaskStatus.DUE_TODAY]):
         notifications.append({
             "id": f"task-today-{t.id}",
-            "title": f"Due today: {t.title}{prop_name}",
-            "type": "task_due_today",
-            "severity": "warning",
+            "title": f"Due today: {t.title}{_prop_name(db, t.property_id)}",
+            "type": "task_due_today", "severity": "warning",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
-            "read": False,
-            "date": str(t.due_date or ""),
+            "read": False, "date": str(t.due_date or ""),
         })
 
-    # Upcoming tasks (due in 7 days)
-    upcoming = db.query(Task).filter(
-        Task.user_id == current_user.id,
-        Task.due_date >= today,
-        Task.due_date <= today + timedelta(days=7),
-        Task.status.notin_([TaskStatus.COMPLETED, TaskStatus.DISMISSED, TaskStatus.OVERDUE, TaskStatus.DUE_TODAY]),
-    ).all()
-    for t in upcoming:
-        prop_name = ""
-        if t.property_id:
-            prop = db.query(Property).filter(Property.id == t.property_id).first()
-            prop_name = f" — {prop.name}" if prop else ""
+    # Upcoming (next 7 days)
+    for t in _upcoming_tasks():
         notifications.append({
             "id": f"task-upcoming-{t.id}",
-            "title": f"Upcoming: {t.title}{prop_name}",
-            "type": "task_upcoming",
-            "severity": "info",
+            "title": f"Upcoming: {t.title}{_prop_name(db, t.property_id)}",
+            "type": "task_upcoming", "severity": "info",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
-            "read": False,
-            "date": str(t.due_date or ""),
+            "read": False, "date": str(t.due_date or ""),
         })
 
-    # Mortgage payments due soon (within 30 days)
-    active_mortgages = db.query(Mortgage).filter(Mortgage.is_active == True).all()
-    for m in active_mortgages:
-        if m.next_due_date:
-            prop = db.query(Property).filter(Property.id == m.property_id).first()
-            prop_name = f" — {prop.name}" if prop else ""
-            days_until = (m.next_due_date - today).days
-            if 0 <= days_until <= 30:
-                notifications.append({
-                    "id": f"mortgage-{m.id}",
-                    "title": f"Mortgage payment due in {days_until}d{prop_name}",
-                    "type": "mortgage_due",
-                    "severity": "info",
-                    "link": f"/properties/{m.property_id}/mortgage" if m.property_id else "#",
-                    "read": False,
-                    "date": str(m.next_due_date),
-                })
+    # Mortgage payments due within 30 days
+    mortgages = db.query(Mortgage).filter(
+        Mortgage.property_id.in_(prop_ids),
+        Mortgage.is_active == True,
+        Mortgage.next_due_date.isnot(None),
+    ).all()
+    for m in mortgages:
+        days = (m.next_due_date - today).days
+        if 0 <= days <= 30:
+            notifications.append({
+                "id": f"mortgage-{m.id}",
+                "title": f"Mortgage payment due in {days}d{_prop_name(db, m.property_id)}",
+                "type": "mortgage_due", "severity": "info",
+                "link": f"/properties/{m.property_id}/mortgage",
+                "read": False, "date": str(m.next_due_date),
+            })
 
     # Insurance renewals within 60 days
-    active_policies = db.query(InsurancePolicy).filter(InsurancePolicy.is_active == True).all()
-    for p in active_policies:
-        if p.renewal_date:
-            prop = db.query(Property).filter(Property.id == p.property_id).first()
-            prop_name = f" — {prop.name}" if prop else ""
-            days_until = (p.renewal_date - today).days
-            if 0 <= days_until <= 60:
-                notifications.append({
-                    "id": f"insurance-{p.id}",
-                    "title": f"Insurance renews in {days_until}d{prop_name}",
-                    "type": "insurance_renewal",
-                    "severity": days_until <= 14 and "warning" or "info",
-                    "link": f"/properties/{p.property_id}/insurance" if p.property_id else "#",
-                    "read": False,
-                    "date": str(p.renewal_date),
-                })
+    policies = db.query(InsurancePolicy).filter(
+        InsurancePolicy.property_id.in_(prop_ids),
+        InsurancePolicy.is_active == True,
+        InsurancePolicy.renewal_date.isnot(None),
+    ).all()
+    for p in policies:
+        days = (p.renewal_date - today).days
+        if 0 <= days <= 60:
+            notifications.append({
+                "id": f"insurance-{p.id}",
+                "title": f"Insurance renews in {days}d{_prop_name(db, p.property_id)}",
+                "type": "insurance_renewal",
+                "severity": "warning" if days <= 14 else "info",
+                "link": f"/properties/{p.property_id}/insurance",
+                "read": False, "date": str(p.renewal_date),
+            })
 
     # Sort by severity then date
     severity_order = {"error": 0, "warning": 1, "info": 2}
     notifications.sort(key=lambda n: (severity_order.get(n["severity"], 9), n.get("date", "")))
 
-    # Calculate read/unread based on last read timestamp
+    # Read/unread tracking
     read_cutoff = current_user.notifications_read_at
     unread_count = 0
     for n in notifications:
         if read_cutoff and n.get("date"):
             try:
-                notif_date = datetime.strptime(n["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
-                n["read"] = notif_date <= read_cutoff
+                nd = datetime.strptime(n["date"], "%Y-%m-%d").replace(tzinfo=timezone.utc)
+                n["read"] = nd <= read_cutoff
             except (ValueError, TypeError):
                 n["read"] = False
         else:
