@@ -140,7 +140,7 @@ def list_entity_investors(
         portal = False
         if row.email:
             portal_user = db.execute(
-                text("SELECT 1 FROM users WHERE email = :email"),
+                text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
                 {"email": row.email},
             ).first()
             portal = portal_user is not None
@@ -196,7 +196,7 @@ def add_entity_investor(
     portal_user_id = None
     if data.email:
         portal_user = db.execute(
-            text("SELECT id FROM users WHERE email = :email"),
+            text("SELECT id FROM users WHERE email = :email AND role = 'investor'"),
             {"email": data.email},
         ).first()
         if portal_user:
