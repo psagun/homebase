@@ -323,7 +323,7 @@ def remove_entity_investor(
 # ─── Property Ownership ───
 
 
-@router.get("/properties/{property_id}/ownership", response_model=PropertyOwnershipResponse)
+@router.get("/properties/{property_id}/ownership")
 def get_property_ownership(
     property_id: uuid.UUID,
     current_user: User = Depends(get_current_user),
@@ -338,49 +338,58 @@ def get_property_ownership(
             ownership_type="Individual",
         )
 
-    entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == prop.ownership_entity_id).first()
-    if not entity:
-        return PropertyOwnershipResponse(
-            property_id=property_id,
-            ownership_type="Individual",
-        )
+    from sqlalchemy import text
 
-    links = (
-        db.query(OwnershipEntityInvestor)
-        .options(joinedload(OwnershipEntityInvestor.investor))
-        .filter(OwnershipEntityInvestor.ownership_entity_id == entity.id)
-        .all()
-    )
+    entity_row = db.execute(
+        text("SELECT id, name, entity_type, ein, state_of_formation, status, created_at, updated_at FROM ownership_entities WHERE id = :eid"),
+        {"eid": prop.ownership_entity_id},
+    ).first()
+    if not entity_row:
+        return {
+            "property_id": str(property_id),
+            "ownership_type": "Individual",
+            "entity": None,
+            "investors": [],
+        }
 
-    investors = [
-        InvestorResponse(
-            id=link.investor.id,
-            name=link.investor.name,
-            email=link.investor.email,
-            phone=link.investor.phone,
-            ownership_percentage=float(link.ownership_percentage),
-        )
-        for link in links
-    ]
+    investor_rows = db.execute(
+        text("""
+            SELECT i.id, i.name, i.email, i.phone, oei.ownership_percentage
+            FROM ownership_entity_investors oei
+            JOIN investors i ON i.id = oei.investor_id
+            WHERE oei.ownership_entity_id = :eid
+            ORDER BY oei.ownership_percentage DESC
+        """),
+        {"eid": prop.ownership_entity_id},
+    ).fetchall()
 
-    return PropertyOwnershipResponse(
-        property_id=property_id,
-        ownership_type="Business Entity",
-        entity=EntityResponse(
-            id=entity.id,
-            name=entity.name,
-            entity_type=entity.entity_type,
-            ein=entity.ein,
-            state_of_formation=entity.state_of_formation,
-            status=entity.status,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-        ),
-        investors=investors,
-    )
+    return {
+        "property_id": str(property_id),
+        "ownership_type": "Business Entity",
+        "entity": {
+            "id": str(entity_row.id),
+            "name": entity_row.name,
+            "entity_type": entity_row.entity_type,
+            "ein": entity_row.ein,
+            "state_of_formation": entity_row.state_of_formation,
+            "status": entity_row.status,
+            "created_at": str(entity_row.created_at),
+            "updated_at": str(entity_row.updated_at),
+        },
+        "investors": [
+            {
+                "id": str(r.id),
+                "name": r.name,
+                "email": r.email,
+                "phone": r.phone,
+                "ownership_percentage": float(r.ownership_percentage),
+            }
+            for r in investor_rows
+        ],
+    }
 
 
-@router.put("/properties/{property_id}/ownership/entity", response_model=PropertyOwnershipResponse)
+@router.put("/properties/{property_id}/ownership/entity")
 def set_property_ownership_entity(
     property_id: uuid.UUID,
     data: SetPropertyEntityRequest,
@@ -388,50 +397,58 @@ def set_property_ownership_entity(
     db: Session = Depends(get_db),
 ):
     """Set or change the ownership entity for a property."""
+    from sqlalchemy import text
+
     prop = _get_property(current_user.id, property_id, db)
 
-    entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == data.ownership_entity_id).first()
-    if not entity:
+    entity_row = db.execute(
+        text("SELECT id, name, entity_type, ein, state_of_formation, status, created_at, updated_at FROM ownership_entities WHERE id = :eid"),
+        {"eid": data.ownership_entity_id},
+    ).first()
+    if not entity_row:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    prop.ownership_entity_id = data.ownership_entity_id
+    db.execute(
+        text("UPDATE properties SET ownership_entity_id = :eid WHERE id = :pid"),
+        {"eid": data.ownership_entity_id, "pid": property_id},
+    )
     db.commit()
-    db.refresh(prop)
 
-    # Return updated ownership
-    links = (
-        db.query(OwnershipEntityInvestor)
-        .options(joinedload(OwnershipEntityInvestor.investor))
-        .filter(OwnershipEntityInvestor.ownership_entity_id == entity.id)
-        .all()
-    )
+    investor_rows = db.execute(
+        text("""
+            SELECT i.id, i.name, i.email, i.phone, oei.ownership_percentage
+            FROM ownership_entity_investors oei
+            JOIN investors i ON i.id = oei.investor_id
+            WHERE oei.ownership_entity_id = :eid
+            ORDER BY oei.ownership_percentage DESC
+        """),
+        {"eid": data.ownership_entity_id},
+    ).fetchall()
 
-    investors = [
-        InvestorResponse(
-            id=link.investor.id,
-            name=link.investor.name,
-            email=link.investor.email,
-            phone=link.investor.phone,
-            ownership_percentage=float(link.ownership_percentage),
-        )
-        for link in links
-    ]
-
-    return PropertyOwnershipResponse(
-        property_id=property_id,
-        ownership_type="Business Entity",
-        entity=EntityResponse(
-            id=entity.id,
-            name=entity.name,
-            entity_type=entity.entity_type,
-            ein=entity.ein,
-            state_of_formation=entity.state_of_formation,
-            status=entity.status,
-            created_at=entity.created_at,
-            updated_at=entity.updated_at,
-        ),
-        investors=investors,
-    )
+    return {
+        "property_id": str(property_id),
+        "ownership_type": "Business Entity",
+        "entity": {
+            "id": str(entity_row.id),
+            "name": entity_row.name,
+            "entity_type": entity_row.entity_type,
+            "ein": entity_row.ein,
+            "state_of_formation": entity_row.state_of_formation,
+            "status": entity_row.status,
+            "created_at": str(entity_row.created_at),
+            "updated_at": str(entity_row.updated_at),
+        },
+        "investors": [
+            {
+                "id": str(r.id),
+                "name": r.name,
+                "email": r.email,
+                "phone": r.phone,
+                "ownership_percentage": float(r.ownership_percentage),
+            }
+            for r in investor_rows
+        ],
+    }
 
 
 @router.delete("/properties/{property_id}/ownership/entity", status_code=204)
