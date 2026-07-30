@@ -164,22 +164,25 @@ def add_entity_investor(
         )
 
     # Create or reuse investor
-    investor = Investor(
-        id=uuid.uuid4(),
-        name=data.name,
-        email=data.email,
-        phone=data.phone,
-    )
-    db.add(investor)
-    db.flush()
+    try:
+        investor = Investor(
+            id=uuid.uuid4(),
+            name=data.name,
+            email=data.email,
+            phone=data.phone,
+        )
+        db.add(investor)
+        db.flush()
 
-    link = OwnershipEntityInvestor(
-        ownership_entity_id=entity_id,
-        investor_id=investor.id,
-        ownership_percentage=data.ownership_percentage,
-    )
-    db.add(link)
-    db.commit()
+        link = OwnershipEntityInvestor(
+            ownership_entity_id=entity_id,
+            investor_id=investor.id,
+            ownership_percentage=data.ownership_percentage,
+        )
+        db.add(link)
+        db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     return InvestorResponse(
         id=investor.id,
@@ -234,7 +237,10 @@ def update_entity_investor(
         if key in update_data:
             setattr(investor, key, update_data[key])
 
-    db.commit()
+    try:
+        db.commit()
+    except Exception as e:
+        raise HTTPException(status_code=500, detail=f"Database error: {str(e)}")
 
     return InvestorResponse(
         id=investor.id,
