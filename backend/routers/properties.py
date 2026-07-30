@@ -24,6 +24,7 @@ def list_properties(
     return property_service.list_properties(
         db,
         current_user.id,
+        user_role=current_user.role,
         search=search,
         status=status,
         property_type=property_type,

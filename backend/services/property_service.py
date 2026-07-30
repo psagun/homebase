@@ -9,6 +9,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.property import Property, PropertyStatus, PropertyType
 from backend.models.property_investor import PropertyInvestor
+from backend.models.property_investor import PropertyInvestor
 
 
 def _parse_enum(enum_class, value: str):
@@ -22,15 +23,25 @@ def _parse_enum(enum_class, value: str):
 def list_properties(
     db: Session,
     user_id,
+    user_role: str = "admin",
     search: Optional[str] = None,
     status: Optional[str] = None,
     property_type: Optional[str] = None,
 ):
     """List all non-archived properties for a user with optional filters."""
-    query = db.query(Property).filter(
-        Property.user_id == user_id,
-        Property.archived_at.is_(None),
-    )
+    if user_role == "investor":
+        query = db.query(Property).join(
+            PropertyInvestor,
+            Property.id == PropertyInvestor.property_id,
+        ).filter(
+            PropertyInvestor.user_id == user_id,
+            Property.archived_at.is_(None),
+        )
+    else:
+        query = db.query(Property).filter(
+            Property.user_id == user_id,
+            Property.archived_at.is_(None),
+        )
 
     if status:
         status_enum = _parse_enum(PropertyStatus, status)
