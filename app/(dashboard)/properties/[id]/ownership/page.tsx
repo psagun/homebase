@@ -17,6 +17,7 @@ import { useAddEntityInvestor, useUpdateEntityInvestor, useRemoveEntityInvestor 
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import type { EntityData } from "@/lib/api/ownership";
 
 export default function OwnershipPage({ params }: { params: { id: string } }) {
@@ -107,10 +108,23 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
             </h3>
           </div>
           {!isIndividual && (
-            <button onClick={handleRemoveEntity}
-              className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
-              <X className="h-3.5 w-3.5" /> Remove Entity
-            </button>
+            <ActionsMenu
+              label="Ownership entity"
+              actions={[
+                {
+                  label: "Edit Entity Details",
+                  icon: <Pencil className="h-4 w-4" />,
+                  onClick: () => {
+                    setEditEntityMode(true);
+                    setNewEntityName(ownership!.entity!.name);
+                    setNewEntityType(ownership!.entity!.entity_type || "");
+                    setNewEntityEin(ownership!.entity!.ein || "");
+                    setNewEntityState(ownership!.entity!.state_of_formation || "");
+                  },
+                },
+                { label: "Remove from Property", icon: <X className="h-4 w-4" />, destructive: true, onClick: handleRemoveEntity },
+              ]}
+            />
           )}
         </div>
 
@@ -155,16 +169,6 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
                 </p>
               </div>
             </div>
-            <button onClick={() => {
-              setEditEntityMode(true);
-              setNewEntityName(ownership.entity!.name);
-              setNewEntityType(ownership.entity!.entity_type || "");
-              setNewEntityEin(ownership.entity!.ein || "");
-              setNewEntityState(ownership.entity!.state_of_formation || "");
-            }}
-              className="mt-4 flex items-center gap-1.5 text-sm text-primary hover:underline">
-              <Pencil className="h-3.5 w-3.5" /> Edit Entity Details
-            </button>
           </div>
         ) : null}
 
@@ -485,16 +489,22 @@ function InvestorsSection({
                   </td>
                   <td className="px-5 py-3 text-right text-sm font-mono font-semibold">{inv.ownership_percentage.toFixed(1)}%</td>
                   <td className="px-5 py-3 text-right">
-                    <div className="flex items-center justify-end gap-2">
-                      <button onClick={() => handleEdit(inv)}
-                        className="text-xs text-primary hover:underline">Edit</button>
-                      <button onClick={async () => {
-                        if (confirm(`Remove ${inv.name} from this entity?`)) {
-                          await removeInvestor.mutateAsync({ entityId, investorId: inv.id });
-                          onUpdated?.();
-                        }
-                      }}
-                        className="text-xs text-red-600 hover:underline">Remove</button>
+                    <div className="flex items-center justify-end">
+                      <ActionsMenu
+                        label={`${inv.name}`}
+                        actions={[
+                          { label: "Edit Investor", icon: <Pencil className="h-4 w-4" />, onClick: () => handleEdit(inv) },
+                          {
+                            label: "Remove",
+                            icon: <Trash2 className="h-4 w-4" />,
+                            destructive: true,
+                            onClick: async () => {
+                              await removeInvestor.mutateAsync({ entityId, investorId: inv.id });
+                              onUpdated?.();
+                            },
+                          },
+                        ]}
+                      />
                     </div>
                   </td>
                 </tr>

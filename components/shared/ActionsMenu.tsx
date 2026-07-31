@@ -99,13 +99,10 @@ export function ActionsMenu({ actions, label, align = "right" }: ActionsMenuProp
         aria-expanded={open}
         onClick={() => setOpen((o) => !o)}
         className={cn(
-          "rounded-md p-2 text-muted-foreground transition-opacity",
+          "rounded-md p-2 text-muted-foreground transition-colors",
           "hover:bg-muted hover:text-foreground",
           "focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
-          // Desktop: hidden until card hover or focus; Mobile: always visible
-          open
-            ? "opacity-100"
-            : "opacity-100 sm:opacity-0 sm:group-hover:opacity-100 sm:group-focus-within:opacity-100 sm:focus-visible:opacity-100"
+          open && "bg-muted text-foreground"
         )}
         style={{ minWidth: 36, minHeight: 36 }}
       >
