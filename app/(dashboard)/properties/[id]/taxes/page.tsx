@@ -207,7 +207,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
             <div><p className="text-xs text-muted-foreground uppercase">Next Due</p><p className="text-sm font-semibold">{t.next_due_date ? new Date(t.next_due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p></div>
           </div>
           <div className="flex items-center gap-3 mt-4 pt-3 border-t">
-            {t.portal_url ? (
+            {t.portal_url && /^https?:\/\//.test(t.portal_url) ? (
               <Link href={t.portal_url} target="_blank" rel="noopener noreferrer"
                 className="inline-flex items-center gap-2 rounded-md bg-[#00D632] px-4 py-2 text-sm font-bold text-white shadow-md hover:bg-[#00b82a] transition-colors">
                 <ExternalLink className="h-4 w-4" /> Pay Taxes

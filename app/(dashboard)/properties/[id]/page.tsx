@@ -23,7 +23,7 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
       if (mortgage?.portal_url) links.push({ label: "Pay Mortgage", url: mortgage.portal_url, icon: <Landmark className="h-4 w-4" /> });
       if (insurance?.portal_url) links.push({ label: "Pay Insurance", url: insurance.portal_url, icon: <ShieldCheck className="h-4 w-4" /> });
       if (Array.isArray(taxes)) {
-        const tax = taxes.find((t: any) => t?.portal_url);
+        const tax = taxes.find((t: any) => t?.portal_url && /^https?:\/\//.test(t.portal_url));
         if (tax?.portal_url) links.push({ label: "Pay Taxes", url: tax.portal_url, icon: <Receipt className="h-4 w-4" /> });
       }
       setPaymentLinks(links);

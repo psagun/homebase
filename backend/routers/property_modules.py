@@ -1,6 +1,8 @@
 """Generic CRUD for property sub-modules (taxes, tenants, maintenance)."""
 import uuid
 from datetime import date
+from urllib.parse import urlparse
+
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
 from backend.dependencies import get_current_user, get_db
@@ -12,6 +14,15 @@ from backend.models.maintenance_record import MaintenanceRecord
 
 router = APIRouter()
 MODEL_MAP = {"taxes": PropertyTax, "tenants": Tenant, "maintenance": MaintenanceRecord}
+
+
+def _validate_portal_url(value):
+    """Ensure portal URLs use a safe scheme (http/https only)."""
+    if value is None:
+        return
+    parsed = urlparse(str(value))
+    if parsed.scheme not in ("https", "http"):
+        raise HTTPException(400, "portal_url must start with http:// or https://")
 
 def _get_prop(user, property_id, db):
     """Verify user has access to this property. Checks both direct ownership and PropertyInvestor."""
@@ -41,6 +52,7 @@ def list_taxes(property_id: uuid.UUID, cur=Depends(get_current_user), db: Sessio
 @router.post("/properties/{property_id}/taxes")
 def create_tax(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
+    _validate_portal_url(data.get("portal_url"))
     t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(PropertyTax, k)})
     db.add(t); db.commit(); return t
 
@@ -50,6 +62,7 @@ def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: dict, cur=Depend
     tax = db.query(PropertyTax).filter(PropertyTax.id == tax_id, PropertyTax.property_id == property_id).first()
     if not tax:
         raise HTTPException(404, "Tax record not found")
+    _validate_portal_url(data.get("portal_url"))
     for k, v in data.items():
         if hasattr(PropertyTax, k) and k != "id" and k != "property_id":
             setattr(tax, k, v)
