@@ -39,3 +39,22 @@ export function resetInvestorPassword(id: string): Promise<{ temp_password: stri
 export function deleteInvestor(id: string): Promise<void> {
   return api.delete<void>(`/admin/investors/${id}`);
 }
+
+export interface PropertySuggestion {
+  id: string;
+  name: string;
+  entity_id: string;
+  entity_name: string;
+}
+
+export interface SuggestResult {
+  entities: { id: string; name: string }[];
+  property_ids: string[];
+  properties: PropertySuggestion[];
+}
+
+export function suggestPropertiesForEmail(email: string): Promise<SuggestResult> {
+  return api.get<SuggestResult>(
+    `/admin/investors/suggest-properties?email=${encodeURIComponent(email)}`
+  );
+}

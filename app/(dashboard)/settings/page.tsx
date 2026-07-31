@@ -1,10 +1,11 @@
 "use client";
 
-import { useRef, useState } from "react";
+import { useRef, useState, useEffect } from "react";
 import { useTheme } from "next-themes";
 import { useAuth } from "@/lib/auth/useAuth";
 import { User, Lock, Bell, Sun, Moon, Check, Loader2, Upload, Camera, Users, X, Pencil, Trash2, KeyRound } from "lucide-react";
 import { useInvestors, useCreateInvestor, useUpdateInvestor, useResetInvestorPassword, useDeleteInvestor } from "@/lib/hooks/useAdmin";
+import { suggestPropertiesForEmail } from "@/lib/api/admin";
 import { useProperties } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 
@@ -331,15 +332,44 @@ function InvestorsTab() {
   const [newName, setNewName] = useState("");
   const [newEmail, setNewEmail] = useState("");
   const [newPropertyIds, setNewPropertyIds] = useState<string[]>([]);
+  const [suggestions, setSuggestions] = useState<{ entities: { id: string; name: string }[]; properties: { id: string; name: string; entity_name: string }[] } | null>(null);
+  const [suggestLoading, setSuggestLoading] = useState(false);
 
   // Edit form state
   const [editName, setEditName] = useState("");
   const [editPropertyIds, setEditPropertyIds] = useState<string[]>([]);
 
+  // Fetch property suggestions when email changes (debounced)
+  useEffect(() => {
+    if (!newEmail.trim() || !newEmail.includes("@")) {
+      setSuggestions(null);
+      return;
+    }
+    const t = setTimeout(async () => {
+      setSuggestLoading(true);
+      try {
+        const result = await suggestPropertiesForEmail(newEmail.trim());
+        setSuggestions(result);
+      } catch {
+        setSuggestions(null);
+      }
+      setSuggestLoading(false);
+    }, 500);
+    return () => clearTimeout(t);
+  }, [newEmail]);
+
   const handleToggleNewProperty = (propId: string) => {
     setNewPropertyIds((prev) =>
       prev.includes(propId) ? prev.filter((id) => id !== propId) : [...prev, propId]
     );
+  };
+
+  const selectAllSuggested = () => {
+    if (!suggestions) return;
+    setNewPropertyIds((prev) => {
+      const merged = new Set([...prev, ...suggestions.properties.map((p) => p.id)]);
+      return Array.from(merged);
+    });
   };
 
   const handleToggleEditProperty = (propId: string) => {
@@ -462,6 +492,36 @@ function InvestorsTab() {
               />
             </div>
           </div>
+
+          {/* Property suggestions from ownership entities */}
+          {suggestLoading && (
+            <p className="text-xs text-[#8b8fa3]">Checking ownership entities...</p>
+          )}
+          {suggestions && suggestions.entities.length > 0 && (
+            <div className="rounded-lg border border-blue-200 bg-blue-50 p-3.5">
+              <div className="flex items-center justify-between mb-2">
+                <p className="text-xs font-semibold text-blue-800">
+                  Found in ownership entities
+                </p>
+                <button onClick={selectAllSuggested}
+                  className="text-xs font-medium text-blue-700 hover:underline">
+                  Select all suggested
+                </button>
+              </div>
+              <p className="text-xs text-blue-700 mb-2">
+                This email is an investor in: {suggestions.entities.map((e) => e.name).join(", ")}
+              </p>
+              <div className="flex flex-wrap gap-2">
+                {suggestions.properties.map((p) => (
+                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-white border border-blue-200 px-2.5 py-1 text-xs text-blue-800">
+                    {p.name}
+                    <span className="text-blue-400">({p.entity_name})</span>
+                  </span>
+                ))}
+              </div>
+            </div>
+          )}
+
           <div>
             <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Property Access</label>
             <div className="max-h-40 overflow-y-auto border border-[#e8eaed] rounded-lg p-3 space-y-2">

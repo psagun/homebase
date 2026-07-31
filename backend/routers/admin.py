@@ -78,6 +78,67 @@ def list_investors(
     return _fetch_investors_with_properties(db)
 
 
+@router.get("/investors/suggest-properties")
+def suggest_properties_for_email(
+    email: str = Query(..., description="Email to check ownership entity matches"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Return properties an investor should have access to based on ownership entity membership.
+
+    If this email is recorded as an investor in any ownership entity, all properties
+    linked to those entities are suggested. This lets the admin pre-select the right
+    properties when creating a portal account.
+    """
+    _require_admin(current_user)
+    from sqlalchemy import text
+
+    # Find entities where this email is an investor
+    rows = db.execute(
+        text("""
+            SELECT DISTINCT e.id AS entity_id, e.name AS entity_name
+            FROM ownership_entity_investors oei
+            JOIN investors i ON i.id = oei.investor_id
+            JOIN ownership_entities e ON e.id = oei.ownership_entity_id
+            WHERE LOWER(i.email) = LOWER(:email)
+        """),
+        {"email": email},
+    ).fetchall()
+
+    if not rows:
+        return {"entities": [], "property_ids": []}
+
+    entity_ids = [r.entity_id for r in rows]
+    entity_names = {str(r.entity_id): r.entity_name for r in rows}
+
+    # Find properties linked to those entities
+    props = db.execute(
+        text("""
+            SELECT id, name, ownership_entity_id
+            FROM properties
+            WHERE ownership_entity_id IN :eids AND archived_at IS NULL
+        """),
+        {"eids": tuple(entity_ids)},
+    ).fetchall()
+
+    return {
+        "entities": [
+            {"id": str(eid), "name": entity_names[str(eid)]}
+            for eid in entity_ids
+        ],
+        "property_ids": [str(p.id) for p in props],
+        "properties": [
+            {
+                "id": str(p.id),
+                "name": p.name,
+                "entity_id": str(p.ownership_entity_id),
+                "entity_name": entity_names.get(str(p.ownership_entity_id), ""),
+            }
+            for p in props
+        ],
+    }
+
+
 @router.post("/investors", response_model=InvestorResponse, status_code=status.HTTP_201_CREATED)
 def create_investor(
     data: InvestorCreate,
@@ -110,12 +171,30 @@ def create_investor(
     db.flush()  # get the user ID before assigning properties
 
     # Assign properties
-    if data.property_ids:
-        for prop_id in data.property_ids:
-            assignment = PropertyInvestor(
-                property_id=prop_id, user_id=user.id
-            )
-            db.add(assignment)
+    assigned_ids = set(data.property_ids or [])
+
+    # Auto-link properties from ownership entity membership (email match)
+    from sqlalchemy import text
+    auto_rows = db.execute(
+        text("""
+            SELECT DISTINCT p.id AS prop_id
+            FROM ownership_entity_investors oei
+            JOIN investors i ON i.id = oei.investor_id
+            JOIN properties p ON p.ownership_entity_id = oei.ownership_entity_id
+            WHERE LOWER(i.email) = LOWER(:email) AND p.archived_at IS NULL
+        """),
+        {"email": data.email},
+    ).fetchall()
+    for row in auto_rows:
+        assigned_ids.add(row.prop_id)
+
+    for prop_id in assigned_ids:
+        existing_link = db.query(PropertyInvestor).filter(
+            PropertyInvestor.property_id == prop_id,
+            PropertyInvestor.user_id == user.id,
+        ).first()
+        if not existing_link:
+            db.add(PropertyInvestor(property_id=prop_id, user_id=user.id))
 
     db.commit()
     db.refresh(user)
@@ -126,7 +205,7 @@ def create_investor(
         name=user.name,
         email=user.email,
         role=user.role,
-        property_ids=data.property_ids,
+        property_ids=list(assigned_ids),
     )
     # Attach the plain-text temp password so the admin can share it
     response.temp_password = temp_password
