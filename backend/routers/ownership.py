@@ -122,6 +122,37 @@ def update_entity(
     return entity
 
 
+@router.delete("/ownership-entities/{entity_id}", status_code=204)
+def delete_entity(
+    entity_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Delete an ownership entity (only if no properties reference it)."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot delete entities")
+    from sqlalchemy import text
+
+    # Check properties referencing this entity
+    refs = db.execute(
+        text("SELECT id FROM properties WHERE ownership_entity_id = :eid AND archived_at IS NULL"),
+        {"eid": entity_id},
+    ).fetchall()
+    if refs:
+        raise HTTPException(
+            status_code=400,
+            detail="Cannot delete entity: it is still linked to properties. Unlink them first.",
+        )
+
+    entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == entity_id).first()
+    if not entity:
+        raise HTTPException(status_code=404, detail="Entity not found")
+
+    # Remove investor links (cascade handles the join table)
+    db.delete(entity)
+    db.commit()
+
+
 # ─── Entity Investors ───
 
 
