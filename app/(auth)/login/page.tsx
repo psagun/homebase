@@ -30,7 +30,7 @@ export default function LoginPage() {
   };
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white p-8 shadow-lg">
+    <div className="rounded-lg border bg-card p-8 shadow-lg">
       <h2 className="text-xl font-semibold text-sidebar-bg">Sign in</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Welcome back to HomeBase

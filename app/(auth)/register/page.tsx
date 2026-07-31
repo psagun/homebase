@@ -43,7 +43,7 @@ export default function RegisterPage() {
   };
 
   return (
-    <div className="rounded-lg border border-white/10 bg-white p-8 shadow-lg">
+    <div className="rounded-lg border bg-card p-8 shadow-lg">
       <h2 className="text-xl font-semibold text-sidebar-bg">Create account</h2>
       <p className="mt-1 text-sm text-muted-foreground">
         Start managing your property portfolio

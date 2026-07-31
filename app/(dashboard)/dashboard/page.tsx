@@ -57,8 +57,8 @@ export default function DashboardPage() {
     <div className="space-y-4 w-full">
       {/* Welcome */}
       <div>
-        <h1 className="text-xl font-bold text-[#1a1d2b]">Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""} 👋</h1>
-        <p className="text-sm text-[#8b8fa3] mt-0.5">Here&apos;s what&apos;s happening with your properties.</p>
+        <h1 className="text-xl font-bold text-foreground">Welcome back{user?.name ? `, ${user.name.split(" ")[0]}` : ""} 👋</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Here&apos;s what&apos;s happening with your properties.</p>
       </div>
 
       {/* Stat cards */}
@@ -74,10 +74,10 @@ export default function DashboardPage() {
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
 
         {/* UPCOMING REMINDERS */}
-        <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm flex flex-col">
-          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-[#e8eaed]">
-            <h2 className="text-sm font-semibold text-[#1a1d2b]">Upcoming Reminders</h2>
-            <Link href="/tasks" className="text-xs text-[#3b82f6] font-medium hover:underline">View all</Link>
+        <div className="bg-card rounded-xl border border-border shadow-sm flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground">Upcoming Reminders</h2>
+            <Link href="/tasks" className="text-xs text-primary font-medium hover:underline">View all</Link>
           </div>
           <div className="divide-y divide-[#e8eaed]">
             {stats.reminders && stats.reminders.length > 0 ? (
@@ -90,34 +90,34 @@ export default function DashboardPage() {
                 const { Icon, bg, color } = getRI(r.task_type, r.status);
                 return (
                   <Link key={r.id} href={r.property_id ? `/properties/${r.property_id}` : "/tasks"}
-                    className="flex items-center gap-3 px-5 py-3 hover:bg-[#f8f9fc] transition-colors group">
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors group">
                     <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: bg, color }}><Icon className="h-4 w-4" /></div>
                     <div className="min-w-0 flex-1">
-                      <p className="text-sm font-medium text-[#1a1d2b] line-clamp-2 group-hover:text-[#3b82f6] transition-colors">{r.title}</p>
-                      <p className="text-xs text-[#8b8fa3]">{r.task_type}</p>
+                      <p className="text-sm font-medium text-foreground line-clamp-2 group-hover:text-primary transition-colors">{r.title}</p>
+                      <p className="text-xs text-muted-foreground">{r.task_type}</p>
                       {r.property_name && (
-                        <p className="text-[10px] text-[#8b8fa3]/70 mt-0.5">{r.property_name}</p>
+                        <p className="text-[10px] text-muted-foreground/70 mt-0.5">{r.property_name}</p>
                       )}
                     </div>
                     <span className={`shrink-0 whitespace-nowrap text-xs font-semibold ${relCls}`}>{rel}</span>
-                    <ChevronRight className="h-4 w-4 text-[#c4c6d0] group-hover:text-[#3b82f6] transition-colors shrink-0" />
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
                   </Link>
                 );
               })
-            ) : <div className="py-10 text-center text-sm text-[#8b8fa3]">All caught up!</div>}
+            ) : <div className="py-10 text-center text-sm text-muted-foreground">All caught up!</div>}
           </div>
         </div>
 
         {/* CASH FLOW THIS MONTH */}
-        <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-5 flex flex-col">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 flex flex-col">
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-[#1a1d2b]">Cash Flow This Month</h2>
-            <Link href="/transactions" className="text-xs text-[#3b82f6] font-medium hover:underline">View report</Link>
+            <h2 className="text-sm font-semibold text-foreground">Cash Flow This Month</h2>
+            <Link href="/transactions" className="text-xs text-primary font-medium hover:underline">View report</Link>
           </div>
           {hasTransactions ? (
             <>
-              <p className="text-3xl font-bold text-[#1a1d2b]">{formatCurrency(stats.net_monthly_income)}</p>
-              <p className="text-xs text-[#8b8fa3] mt-0.5 mb-3">Net cash flow across all properties</p>
+              <p className="text-3xl font-bold text-foreground">{formatCurrency(stats.net_monthly_income)}</p>
+              <p className="text-xs text-muted-foreground mt-0.5 mb-3">Net cash flow across all properties</p>
               <div className="flex-1 min-h-[120px]">
                 <svg viewBox="0 0 320 110" className="w-full h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
                   <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} /><stop offset="100%" stopColor="#3b82f6" stopOpacity={0.01} /></linearGradient></defs>
@@ -131,15 +131,15 @@ export default function DashboardPage() {
             </>
           ) : (
             <div className="flex-1 flex items-center justify-center">
-              <p className="text-sm text-[#8b8fa3]">Add transactions to see cash flow</p>
+              <p className="text-sm text-muted-foreground">Add transactions to see cash flow</p>
             </div>
           )}
         </div>
 
         {/* PROPERTIES BY STATUS */}
-        <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-5 flex flex-col">
+        <div className="bg-card rounded-xl border border-border shadow-sm p-5 flex flex-col">
           <div className="mb-4">
-            <h2 className="text-sm font-semibold text-[#1a1d2b]">Properties by Status</h2>
+            <h2 className="text-sm font-semibold text-foreground">Properties by Status</h2>
           </div>
           {stats.properties_by_status.length > 0 ? (
             <div className="flex items-center gap-5 flex-1">
@@ -153,14 +153,14 @@ export default function DashboardPage() {
                 {stats.properties_by_status.map((item: any) => (
                   <div key={item.status} className="flex items-center gap-2">
                     <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ backgroundColor: STATUS_COLORS[item.status] || "#6b7280" }} />
-                    <span className="text-sm text-[#1a1d2b] flex-1">{item.status}</span>
-                    <span className="text-sm font-semibold text-[#1a1d2b] tabular-nums">{item.count}</span>
-                    <span className="text-xs text-[#8b8fa3] w-9 text-right">({((item.count/total)*100).toFixed(0)}%)</span>
+                    <span className="text-sm text-foreground flex-1">{item.status}</span>
+                    <span className="text-sm font-semibold text-foreground tabular-nums">{item.count}</span>
+                    <span className="text-xs text-muted-foreground w-9 text-right">({((item.count/total)*100).toFixed(0)}%)</span>
                   </div>
                 ))}
               </div>
             </div>
-          ) : <div className="py-8 text-center text-sm text-[#8b8fa3]">No data</div>}
+          ) : <div className="py-8 text-center text-sm text-muted-foreground">No data</div>}
         </div>
       </div>
 
@@ -183,10 +183,10 @@ export default function DashboardPage() {
         return (
         <div>
           <div className="flex items-center justify-between mb-3">
-            <h2 className="text-sm font-semibold text-[#1a1d2b]">
+            <h2 className="text-sm font-semibold text-foreground">
               {recentViewed.length > 0 ? "Recently Viewed" : "Recent Properties"}
             </h2>
-            <Link href="/properties" className="text-xs text-[#3b82f6] font-medium hover:underline">View all</Link>
+            <Link href="/properties" className="text-xs text-primary font-medium hover:underline">View all</Link>
           </div>
           <div className="grid grid-cols-2 sm:grid-cols-3 lg:grid-cols-5 gap-3">
             {display.map((p: any, idx: number) => {
@@ -211,15 +211,15 @@ export default function DashboardPage() {
               }
               return (
                 <Link key={p.id} href={`/properties/${p.id}`}
-                  className="group bg-white rounded-xl border border-[#e8eaed] shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
+                  className="group bg-card rounded-xl border border-border shadow-sm hover:shadow-md transition-all hover:-translate-y-0.5">
                   <div className={`h-28 relative overflow-hidden bg-gradient-to-br ${skyGrad}`}>
                     {buildingSvg}
                     <div className="absolute inset-0 bg-gradient-to-t from-black/35 via-transparent to-transparent" />
                     <span className="absolute bottom-2 left-3 text-sm font-bold text-white drop-shadow-lg">{formatCurrency(p.current_value)}</span>
                   </div>
                   <div className="p-3">
-                    <p className="text-sm font-semibold text-[#1a1d2b] line-clamp-1 group-hover:text-[#3b82f6] transition-colors">{p.name}</p>
-                    <p className="text-xs text-[#8b8fa3] truncate">{p.city}, {p.state}</p>
+                    <p className="text-sm font-semibold text-foreground line-clamp-1 group-hover:text-primary transition-colors">{p.name}</p>
+                    <p className="text-xs text-muted-foreground truncate">{p.city}, {p.state}</p>
                     <span className={`inline-block mt-1.5 text-[10px] font-semibold px-2 py-0.5 rounded-full ${
                       p.status === "Occupied" ? "bg-emerald-50 text-emerald-700" :
                       p.status === "Vacant" ? "bg-amber-50 text-amber-700" :
@@ -240,11 +240,11 @@ function SumCard({ icon, bg, color, label, value, sub, subColor }: {
   icon: React.ReactNode; bg: string; color: string; label: string; value: string; sub: string; subColor: string;
 }) {
   return (
-    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-3 md:p-4 flex items-center gap-3 md:gap-4">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-3 md:p-4 flex items-center gap-3 md:gap-4">
       <div className="flex h-10 w-10 md:h-12 md:w-12 shrink-0 items-center justify-center rounded-full" style={{ backgroundColor: bg, color }}>{icon}</div>
       <div className="min-w-0 flex-1">
-        <p className="text-xs font-medium text-[#8b8fa3] uppercase tracking-wide">{label}</p>
-        <p className="text-sm md:text-lg font-bold text-[#1a1d2b] mt-0.5">{value}</p>
+        <p className="text-xs font-medium text-muted-foreground uppercase tracking-wide">{label}</p>
+        <p className="text-sm md:text-lg font-bold text-foreground mt-0.5">{value}</p>
         <p className="text-xs font-medium mt-0.5" style={{ color: subColor }}>{sub}</p>
       </div>
     </div>

@@ -27,8 +27,8 @@ export default function SettingsPage() {
   return (
     <div className="max-w-4xl mx-auto py-6">
       <div className="mb-6">
-        <h1 className="text-xl font-bold text-[#1a1d2b]">Settings</h1>
-        <p className="text-sm text-[#8b8fa3] mt-0.5">Manage your account and preferences</p>
+        <h1 className="text-xl font-bold text-foreground">Settings</h1>
+        <p className="text-sm text-muted-foreground mt-0.5">Manage your account and preferences</p>
       </div>
 
       <div className="flex gap-6">
@@ -40,8 +40,8 @@ export default function SettingsPage() {
               onClick={() => setActiveTab(tab.id)}
               className={`flex items-center gap-2.5 w-full rounded-lg px-3 py-2.5 text-sm font-medium transition-colors text-left ${
                 activeTab === tab.id
-                  ? "bg-white border border-[#e8eaed] shadow-sm text-[#1a1d2b]"
-                  : "text-[#8b8fa3] hover:text-[#1a1d2b] hover:bg-white/60"
+                  ? "bg-card border border-border shadow-sm text-foreground"
+                  : "text-muted-foreground hover:text-foreground hover:bg-muted"
               }`}
             >
               {tab.icon}
@@ -95,10 +95,10 @@ function ProfileTab({ user }: { user: { name?: string; email?: string; avatar_ur
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6 space-y-6">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-6">
       <div>
-        <h2 className="text-base font-semibold text-[#1a1d2b]">Profile Information</h2>
-        <p className="text-xs text-[#8b8fa3] mt-0.5">Your photo, name, and email address</p>
+        <h2 className="text-base font-semibold text-foreground">Profile Information</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Your photo, name, and email address</p>
       </div>
 
       {msg && <div className="text-xs font-medium text-emerald-600 bg-emerald-50 px-3 py-2 rounded-md">{msg}</div>}
@@ -108,7 +108,7 @@ function ProfileTab({ user }: { user: { name?: string; email?: string; avatar_ur
         <div className="relative group">
           <input type="file" ref={fileInputRef} onChange={handleAvatarUpload} className="hidden" accept="image/png,image/jpeg,image/webp,image/gif" />
           <button onClick={() => fileInputRef.current?.click()}
-            className="flex h-20 w-20 items-center justify-center rounded-full bg-[#eef2ff] text-3xl font-bold text-[#3b82f6] overflow-hidden relative transition-all hover:ring-4 hover:ring-blue-100">
+            className="flex h-20 w-20 items-center justify-center rounded-full bg-[#eef2ff] text-3xl font-bold text-primary overflow-hidden relative transition-all hover:ring-4 hover:ring-blue-100">
             {avatarUrl ? (
               <img src={avatarUrl} alt="Avatar" className="h-full w-full object-cover" />
             ) : (
@@ -118,14 +118,14 @@ function ProfileTab({ user }: { user: { name?: string; email?: string; avatar_ur
               <Camera className="h-6 w-6 text-white" />
             </div>
           </button>
-          <p className="text-center text-[10px] text-[#8b8fa3] mt-1.5">Click to upload</p>
+          <p className="text-center text-[10px] text-muted-foreground mt-1.5">Click to upload</p>
         </div>
         <div className="flex-1">
           {editName ? (
             <div className="flex items-center gap-2">
               <input
                 type="text" value={name} onChange={(e) => setName(e.target.value)}
-                className="rounded-lg border border-[#e8eaed] px-3 py-2 text-sm font-medium outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20 w-64"
+                className="rounded-lg border border-border px-3 py-2 text-sm font-medium outline-none focus:border-primary focus:ring-1 focus:ring-primary/20 w-64"
                 autoFocus
               />
               <button onClick={handleSave} disabled={saving}
@@ -134,25 +134,25 @@ function ProfileTab({ user }: { user: { name?: string; email?: string; avatar_ur
                 Save
               </button>
               <button onClick={() => { setEditName(false); setName(user?.name || ""); }}
-                className="rounded-lg border border-[#e8eaed] px-3.5 py-2 text-xs font-medium text-[#8b8fa3] hover:bg-gray-50 transition-colors">
+                className="rounded-lg border border-border px-3.5 py-2 text-xs font-medium text-muted-foreground hover:bg-gray-50 transition-colors">
                 Cancel
               </button>
             </div>
           ) : (
             <div>
-              <p className="text-sm font-semibold text-[#1a1d2b]">{user?.name || "—"}</p>
+              <p className="text-sm font-semibold text-foreground">{user?.name || "—"}</p>
               <button onClick={() => setEditName(true)}
-                className="text-xs text-[#3b82f6] hover:underline mt-0.5">Edit</button>
+                className="text-xs text-primary hover:underline mt-0.5">Edit</button>
             </div>
           )}
         </div>
       </div>
 
       {/* Email (read-only) */}
-      <div className="pt-4 border-t border-[#e8eaed]">
-        <label className="text-xs font-semibold text-[#8b8fa3] uppercase tracking-wider">Email Address</label>
-        <p className="text-sm font-medium text-[#1a1d2b] mt-1">{user?.email || "—"}</p>
-        <p className="text-xs text-[#8b8fa3] mt-0.5">Contact support to change your email</p>
+      <div className="pt-4 border-t border-border">
+        <label className="text-xs font-semibold text-muted-foreground uppercase tracking-wider">Email Address</label>
+        <p className="text-sm font-medium text-foreground mt-1">{user?.email || "—"}</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Contact support to change your email</p>
       </div>
     </div>
   );
@@ -188,10 +188,10 @@ function SecurityTab() {
   };
 
   return (
-    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6 space-y-5">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-[#1a1d2b]">Password & Security</h2>
-        <p className="text-xs text-[#8b8fa3] mt-0.5">Change your login password</p>
+        <h2 className="text-base font-semibold text-foreground">Password & Security</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Change your login password</p>
       </div>
 
       <form onSubmit={handleSubmit} className="max-w-sm space-y-3">
@@ -199,19 +199,19 @@ function SecurityTab() {
           <div className={`text-xs font-medium p-2.5 rounded-md ${pwMsg.ok ? "bg-emerald-50 text-emerald-700" : "bg-red-50 text-red-700"}`}>{pwMsg.text}</div>
         )}
         <div>
-          <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Current Password</label>
+          <label className="block text-xs font-semibold text-foreground mb-1.5">Current Password</label>
           <input type="password" required value={currentPw} onChange={e => setCurrentPw(e.target.value)}
-            className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20" />
+            className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">New Password</label>
+          <label className="block text-xs font-semibold text-foreground mb-1.5">New Password</label>
           <input type="password" required value={newPw} onChange={e => setNewPw(e.target.value)}
-            className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20" placeholder="Minimum 8 characters" />
+            className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20" placeholder="Minimum 8 characters" />
         </div>
         <div>
-          <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Confirm New Password</label>
+          <label className="block text-xs font-semibold text-foreground mb-1.5">Confirm New Password</label>
           <input type="password" required value={confirmPw} onChange={e => setConfirmPw(e.target.value)}
-            className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20" />
+            className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20" />
         </div>
         <button type="submit" disabled={pwLoading}
           className="rounded-lg bg-[#1a1d2b] px-5 py-2.5 text-sm font-semibold text-white hover:bg-black transition-colors disabled:opacity-50 flex items-center gap-2">
@@ -235,10 +235,10 @@ function NotificationsTab() {
   ];
 
   return (
-    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6 space-y-5">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-[#1a1d2b]">Notification Preferences</h2>
-        <p className="text-xs text-[#8b8fa3] mt-0.5">Choose which notifications you receive</p>
+        <h2 className="text-base font-semibold text-foreground">Notification Preferences</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Choose which notifications you receive</p>
       </div>
       <div className="divide-y divide-[#e8eaed]">
         {items.map((item) => (
@@ -254,8 +254,8 @@ function NotificationRow({ label, desc, on: initial }: { label: string; desc: st
   return (
     <label className="flex items-center justify-between py-3.5 cursor-pointer">
       <div>
-        <p className="text-sm font-medium text-[#1a1d2b]">{label}</p>
-        <p className="text-xs text-[#8b8fa3]">{desc}</p>
+        <p className="text-sm font-medium text-foreground">{label}</p>
+        <p className="text-xs text-muted-foreground">{desc}</p>
       </div>
       <button
         type="button" role="switch" aria-checked={enabled}
@@ -275,38 +275,38 @@ function NotificationRow({ label, desc, on: initial }: { label: string; desc: st
 /* ─── Appearance Tab ─── */
 function AppearanceTab({ theme, setTheme }: { theme?: string; setTheme: (t: string) => void }) {
   return (
-    <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6 space-y-5">
+    <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
       <div>
-        <h2 className="text-base font-semibold text-[#1a1d2b]">Appearance</h2>
-        <p className="text-xs text-[#8b8fa3] mt-0.5">Choose your preferred theme for the dashboard</p>
+        <h2 className="text-base font-semibold text-foreground">Appearance</h2>
+        <p className="text-xs text-muted-foreground mt-0.5">Choose your preferred theme for the dashboard</p>
       </div>
       <div className="grid grid-cols-2 gap-3 max-w-md">
         <button
           onClick={() => setTheme("light")}
           className={`flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all ${
-            theme === "light" ? "border-[#3b82f6] bg-blue-50/50" : "border-[#e8eaed] hover:border-gray-300"
+            theme === "light" ? "border-[#3b82f6] bg-blue-50/50" : "border-border hover:border-gray-300"
           }`}
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-amber-100 text-amber-600">
             <Sun className="h-7 w-7" />
           </div>
           <div className="text-center">
-            <p className={`text-sm font-semibold ${theme === "light" ? "text-[#3b82f6]" : "text-[#1a1d2b]"}`}>Light</p>
-            <p className="text-xs text-[#8b8fa3] mt-0.5">Bright & clean</p>
+            <p className={`text-sm font-semibold ${theme === "light" ? "text-primary" : "text-foreground"}`}>Light</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Bright & clean</p>
           </div>
         </button>
         <button
           onClick={() => setTheme("dark")}
           className={`flex flex-col items-center gap-3 rounded-xl border-2 p-5 transition-all ${
-            theme === "dark" ? "border-[#3b82f6] bg-blue-50/50" : "border-[#e8eaed] hover:border-gray-300"
+            theme === "dark" ? "border-[#3b82f6] bg-blue-50/50" : "border-border hover:border-gray-300"
           }`}
         >
           <div className="flex h-14 w-14 items-center justify-center rounded-full bg-gray-700 text-gray-300">
             <Moon className="h-7 w-7" />
           </div>
           <div className="text-center">
-            <p className={`text-sm font-semibold ${theme === "dark" ? "text-[#3b82f6]" : "text-[#1a1d2b]"}`}>Dark</p>
-            <p className="text-xs text-[#8b8fa3] mt-0.5">Easy on the eyes</p>
+            <p className={`text-sm font-semibold ${theme === "dark" ? "text-primary" : "text-foreground"}`}>Dark</p>
+            <p className="text-xs text-muted-foreground mt-0.5">Easy on the eyes</p>
           </div>
         </button>
       </div>
@@ -438,11 +438,11 @@ function InvestorsTab() {
   return (
     <div className="space-y-5">
       {/* Header */}
-      <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6">
+      <div className="bg-card rounded-xl border border-border shadow-sm p-6">
         <div className="flex items-center justify-between">
           <div>
-            <h2 className="text-base font-semibold text-[#1a1d2b]">Investors</h2>
-            <p className="text-xs text-[#8b8fa3] mt-0.5">Manage investor accounts and property assignments</p>
+            <h2 className="text-base font-semibold text-foreground">Investors</h2>
+            <p className="text-xs text-muted-foreground mt-0.5">Manage investor accounts and property assignments</p>
           </div>
           <button
             onClick={() => { setShowAddForm(!showAddForm); setEditingId(null); }}
@@ -472,22 +472,22 @@ function InvestorsTab() {
 
       {/* Add form */}
       {showAddForm && (
-        <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm p-6 space-y-4">
-          <h3 className="text-sm font-semibold text-[#1a1d2b]">New Investor</h3>
+        <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-4">
+          <h3 className="text-sm font-semibold text-foreground">New Investor</h3>
           <div className="grid grid-cols-2 gap-4">
             <div>
-              <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Name</label>
+              <label className="block text-xs font-semibold text-foreground mb-1.5">Name</label>
               <input
                 type="text" value={newName} onChange={(e) => setNewName(e.target.value)}
-                className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20"
+                className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                 placeholder="Full name"
               />
             </div>
             <div>
-              <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Email</label>
+              <label className="block text-xs font-semibold text-foreground mb-1.5">Email</label>
               <input
                 type="email" value={newEmail} onChange={(e) => setNewEmail(e.target.value)}
-                className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20"
+                className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                 placeholder="investor@example.com"
               />
             </div>
@@ -495,7 +495,7 @@ function InvestorsTab() {
 
           {/* Property suggestions from ownership entities */}
           {suggestLoading && (
-            <p className="text-xs text-[#8b8fa3]">Checking ownership entities...</p>
+            <p className="text-xs text-muted-foreground">Checking ownership entities...</p>
           )}
           {suggestions && suggestions.entities.length > 0 && (
             <div className="rounded-lg border border-blue-200 bg-blue-50 p-3.5">
@@ -513,7 +513,7 @@ function InvestorsTab() {
               </p>
               <div className="flex flex-wrap gap-2">
                 {suggestions.properties.map((p) => (
-                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-white border border-blue-200 px-2.5 py-1 text-xs text-blue-800">
+                  <span key={p.id} className="inline-flex items-center gap-1.5 rounded-full bg-card border border-blue-200 px-2.5 py-1 text-xs text-blue-800">
                     {p.name}
                     <span className="text-blue-400">({p.entity_name})</span>
                   </span>
@@ -523,8 +523,8 @@ function InvestorsTab() {
           )}
 
           <div>
-            <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Property Access</label>
-            <div className="max-h-40 overflow-y-auto border border-[#e8eaed] rounded-lg p-3 space-y-2">
+            <label className="block text-xs font-semibold text-foreground mb-1.5">Property Access</label>
+            <div className="max-h-40 overflow-y-auto border border-border rounded-lg p-3 space-y-2">
               {properties && properties.length > 0 ? (
                 properties.map((prop) => (
                   <label key={prop.id} className="flex items-center gap-2.5 cursor-pointer">
@@ -532,13 +532,13 @@ function InvestorsTab() {
                       type="checkbox"
                       checked={newPropertyIds.includes(prop.id)}
                       onChange={() => handleToggleNewProperty(prop.id)}
-                      className="h-4 w-4 rounded border-gray-300 text-[#3b82f6] focus:ring-[#3b82f6]/20"
+                      className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/20"
                     />
-                    <span className="text-sm text-[#1a1d2b]">{prop.name}</span>
+                    <span className="text-sm text-foreground">{prop.name}</span>
                   </label>
                 ))
               ) : (
-                <p className="text-sm text-[#8b8fa3]">No properties available</p>
+                <p className="text-sm text-muted-foreground">No properties available</p>
               )}
             </div>
           </div>
@@ -554,7 +554,7 @@ function InvestorsTab() {
       )}
 
       {/* Investors list */}
-      <div className="bg-white rounded-xl border border-[#e8eaed] shadow-sm">
+      <div className="bg-card rounded-xl border border-border shadow-sm">
         {investors && investors.length > 0 ? (
           <div className="divide-y divide-[#e8eaed]">
             {investors.map((investor) => (
@@ -564,20 +564,20 @@ function InvestorsTab() {
                   <div className="space-y-4">
                     <div className="grid grid-cols-2 gap-4">
                       <div>
-                        <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Name</label>
+                        <label className="block text-xs font-semibold text-foreground mb-1.5">Name</label>
                         <input
                           type="text" value={editName} onChange={(e) => setEditName(e.target.value)}
-                          className="w-full rounded-lg border border-[#e8eaed] px-3.5 py-2.5 text-sm outline-none focus:border-[#3b82f6] focus:ring-1 focus:ring-[#3b82f6]/20"
+                          className="w-full rounded-lg border border-border px-3.5 py-2.5 text-sm outline-none focus:border-primary focus:ring-1 focus:ring-primary/20"
                         />
                       </div>
                       <div>
-                        <label className="block text-xs font-semibold text-[#8b8fa3] mb-1.5">Email</label>
-                        <p className="text-sm font-medium text-[#1a1d2b] py-2.5">{investor.email}</p>
+                        <label className="block text-xs font-semibold text-muted-foreground mb-1.5">Email</label>
+                        <p className="text-sm font-medium text-foreground py-2.5">{investor.email}</p>
                       </div>
                     </div>
                     <div>
-                      <label className="block text-xs font-semibold text-[#1a1d2b] mb-1.5">Property Access</label>
-                      <div className="max-h-32 overflow-y-auto border border-[#e8eaed] rounded-lg p-3 space-y-2">
+                      <label className="block text-xs font-semibold text-foreground mb-1.5">Property Access</label>
+                      <div className="max-h-32 overflow-y-auto border border-border rounded-lg p-3 space-y-2">
                         {properties && properties.length > 0 ? (
                           properties.map((prop) => (
                             <label key={prop.id} className="flex items-center gap-2.5 cursor-pointer">
@@ -585,13 +585,13 @@ function InvestorsTab() {
                                 type="checkbox"
                                 checked={editPropertyIds.includes(prop.id)}
                                 onChange={() => handleToggleEditProperty(prop.id)}
-                                className="h-4 w-4 rounded border-gray-300 text-[#3b82f6] focus:ring-[#3b82f6]/20"
+                                className="h-4 w-4 rounded border-gray-300 text-primary focus:ring-primary/20"
                               />
-                              <span className="text-sm text-[#1a1d2b]">{prop.name}</span>
+                              <span className="text-sm text-foreground">{prop.name}</span>
                             </label>
                           ))
                         ) : (
-                          <p className="text-sm text-[#8b8fa3]">No properties available</p>
+                          <p className="text-sm text-muted-foreground">No properties available</p>
                         )}
                       </div>
                     </div>
@@ -606,7 +606,7 @@ function InvestorsTab() {
                       </button>
                       <button
                         onClick={() => setEditingId(null)}
-                        className="rounded-lg border border-[#e8eaed] px-4 py-2 text-xs font-medium text-[#8b8fa3] hover:bg-gray-50 transition-colors"
+                        className="rounded-lg border border-border px-4 py-2 text-xs font-medium text-muted-foreground hover:bg-gray-50 transition-colors"
                       >
                         Cancel
                       </button>
@@ -616,9 +616,9 @@ function InvestorsTab() {
                   /* ── Investor Row ── */
                   <div className="flex items-center justify-between">
                     <div className="flex-1 min-w-0">
-                      <p className="text-sm font-semibold text-[#1a1d2b]">{investor.name}</p>
-                      <p className="text-xs text-[#8b8fa3] mt-0.5">{investor.email}</p>
-                      <p className="text-xs text-[#8b8fa3] mt-0.5">
+                      <p className="text-sm font-semibold text-foreground">{investor.name}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">{investor.email}</p>
+                      <p className="text-xs text-muted-foreground mt-0.5">
                         {investor.property_ids.length} property{investor.property_ids.length !== 1 ? "ies" : "y"}
                         {investor.property_ids.length > 0 ? ` assigned` : ``}
                       </p>
@@ -626,7 +626,7 @@ function InvestorsTab() {
                     <div className="flex items-center gap-1.5 shrink-0">
                       <button
                         onClick={() => startEditing(investor)}
-                        className="rounded-lg p-2 text-[#8b8fa3] hover:text-[#1a1d2b] hover:bg-gray-100 transition-colors"
+                        className="rounded-lg p-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors"
                         title="Edit"
                       >
                         <Pencil className="h-4 w-4" />
@@ -634,7 +634,7 @@ function InvestorsTab() {
                       <button
                         onClick={() => handleResetPassword(investor.id)}
                         disabled={resetPassword.isPending}
-                        className="rounded-lg p-2 text-[#8b8fa3] hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
+                        className="rounded-lg p-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
                         title="Reset Password"
                       >
                         <KeyRound className="h-4 w-4" />
@@ -650,7 +650,7 @@ function InvestorsTab() {
                           </button>
                           <button
                             onClick={() => setConfirmDelete(null)}
-                            className="rounded-lg border border-[#e8eaed] px-3 py-2 text-xs font-medium text-[#8b8fa3] hover:bg-gray-50 transition-colors"
+                            className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-gray-50 transition-colors"
                           >
                             Cancel
                           </button>
@@ -658,7 +658,7 @@ function InvestorsTab() {
                       ) : (
                         <button
                           onClick={() => setConfirmDelete(investor.id)}
-                          className="rounded-lg p-2 text-[#8b8fa3] hover:text-red-600 hover:bg-red-50 transition-colors"
+                          className="rounded-lg p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
                           title="Remove"
                         >
                           <Trash2 className="h-4 w-4" />
@@ -672,9 +672,9 @@ function InvestorsTab() {
           </div>
         ) : (
           <div className="p-10 text-center">
-            <Users className="h-10 w-10 text-[#8b8fa3] mx-auto mb-3" />
-            <p className="text-sm font-medium text-[#1a1d2b]">No investors yet</p>
-            <p className="text-xs text-[#8b8fa3] mt-1">Click &quot;Add Investor&quot; to create the first one.</p>
+            <Users className="h-10 w-10 text-muted-foreground mx-auto mb-3" />
+            <p className="text-sm font-medium text-foreground">No investors yet</p>
+            <p className="text-xs text-muted-foreground mt-1">Click &quot;Add Investor&quot; to create the first one.</p>
           </div>
         )}
       </div>
