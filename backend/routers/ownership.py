@@ -70,6 +70,8 @@ def create_entity(
     db: Session = Depends(get_db),
 ):
     """Create a new ownership entity."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot create entities")
     entity = OwnershipEntity(
         id=uuid.uuid4(),
         name=data.name,
@@ -105,6 +107,8 @@ def update_entity(
     db: Session = Depends(get_db),
 ):
     """Update an ownership entity."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot modify entities")
     entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -176,6 +180,8 @@ def add_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Add an investor to an ownership entity."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
     from decimal import Decimal
     from sqlalchemy import text
 
@@ -251,6 +257,8 @@ def update_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Update an investor's details or ownership percentage."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
     from decimal import Decimal
     from sqlalchemy import text
 
@@ -323,6 +331,8 @@ def remove_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Remove an investor from an ownership entity. Also cleans up PropertyInvestor links."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
     from sqlalchemy import text
 
     link = db.query(OwnershipEntityInvestor).filter(
