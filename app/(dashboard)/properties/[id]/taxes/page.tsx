@@ -1,7 +1,10 @@
 "use client";
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { ExternalLink, Plus, Pencil, Trash2, Check, X, Landmark } from "lucide-react";
+import {
+  ExternalLink, Plus, Pencil, Trash2, Check, X,
+  Landmark, CalendarClock, DollarSign, Receipt, Layers,
+} from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -93,6 +96,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
       next_due_date: t.next_due_date || "",
     });
     setShowForm(true);
+    window.scrollTo({ top: 0, behavior: "smooth" });
   };
 
   const handleDelete = async (t: TaxData) => {
@@ -112,13 +116,22 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
   if (loading) return <LoadingState text="Loading tax info..." />;
   if (error) return <ErrorState title="Failed to load taxes" onRetry={() => { setError(false); setLoading(true); loadTaxes().catch(() => setError(true)).finally(() => setLoading(false)); }} />;
 
+  const totalAnnual = taxes.reduce((s, t) => s + (Number(t.annual_tax) || 0), 0);
+  const upcoming = taxes
+    .filter((t) => t.next_due_date)
+    .sort((a, b) => (a.next_due_date! > b.next_due_date! ? 1 : -1))[0];
+
   return (
     <div className="space-y-6">
+      {/* Header */}
       <div className="flex items-center justify-between">
-        <h2 className="text-lg font-semibold">Property Taxes{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}</h2>
+        <div>
+          <h2 className="text-lg font-semibold">Property Taxes{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}</h2>
+          <p className="text-xs text-muted-foreground mt-0.5">County tax records and payment portals</p>
+        </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
-            className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
+            className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
             <Plus className="h-4 w-4" /> Add Tax Record
           </button>
         )}
@@ -130,35 +143,74 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
         </div>
       )}
 
+      {/* Summary strip */}
+      {taxes.length > 0 && !showForm && (
+        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <DollarSign className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Total Annual Tax</span>
+            </div>
+            <p className="text-xl font-bold text-foreground">{formatCurrency(totalAnnual)}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{taxes.length} record{taxes.length > 1 ? "s" : ""}</p>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <CalendarClock className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Next Due Date</span>
+            </div>
+            <p className="text-xl font-bold text-foreground">
+              {upcoming ? new Date(upcoming.next_due_date!).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">{upcoming?.county || "No upcoming dates"}</p>
+          </div>
+          <div className="rounded-lg border bg-card p-4">
+            <div className="flex items-center gap-2 text-muted-foreground mb-1">
+              <Layers className="h-4 w-4" />
+              <span className="text-xs font-semibold uppercase tracking-wider">Common Frequency</span>
+            </div>
+            <p className="text-xl font-bold text-foreground">
+              {taxes.map((t) => t.payment_frequency).filter(Boolean)[0] || "—"}
+            </p>
+            <p className="text-xs text-muted-foreground mt-0.5">Payment schedule</p>
+          </div>
+        </div>
+      )}
+
       {/* Add / Edit Form */}
       {showForm && (
-        <div className="rounded-lg border bg-card p-5 space-y-4">
-          <h3 className="text-sm font-semibold">{editId ? "Edit Tax Record" : "Add Tax Record"}</h3>
-          <div className="grid grid-cols-2 md:grid-cols-3 gap-3">
+        <div className="rounded-lg border bg-card p-5 space-y-4 shadow-sm">
+          <div className="flex items-center justify-between">
+            <h3 className="text-base font-semibold">{editId ? "Edit Tax Record" : "Add Tax Record"}</h3>
+            <button onClick={resetForm} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted transition-colors">
+              <X className="h-4 w-4" />
+            </button>
+          </div>
+          <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
             <div>
-              <label className="block text-xs font-medium mb-1">County</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">County</label>
               <input placeholder="e.g. Maricopa" value={form.county} onChange={e => setForm(p => ({ ...p, county: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Tax Authority</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Tax Authority</label>
               <input placeholder="e.g. County Assessor" value={form.tax_authority} onChange={e => setForm(p => ({ ...p, tax_authority: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Parcel ID</label>
-              <input placeholder="Parcel / APN number" value={form.parcel_id} onChange={e => setForm(p => ({ ...p, parcel_id: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Parcel ID / APN</label>
+              <input placeholder="Parcel number" value={form.parcel_id} onChange={e => setForm(p => ({ ...p, parcel_id: e.target.value }))}
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Annual Tax ($)</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Annual Tax ($)</label>
               <input type="number" step="0.01" placeholder="0.00" value={form.annual_tax} onChange={e => setForm(p => ({ ...p, annual_tax: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Payment Frequency</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Payment Frequency</label>
               <select value={form.payment_frequency} onChange={e => setForm(p => ({ ...p, payment_frequency: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none">
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary">
                 <option value="Annual">Annual</option>
                 <option value="Semi-Annual">Semi-Annual</option>
                 <option value="Quarterly">Quarterly</option>
@@ -166,63 +218,113 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
               </select>
             </div>
             <div>
-              <label className="block text-xs font-medium mb-1">Next Due Date</label>
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Next Due Date</label>
               <input type="date" value={form.next_due_date} onChange={e => setForm(p => ({ ...p, next_due_date: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
             </div>
-            <div className="col-span-2">
-              <label className="block text-xs font-medium mb-1">Tax Payment Portal URL</label>
+            <div className="sm:col-span-2 lg:col-span-3">
+              <label className="block text-xs font-medium text-muted-foreground mb-1">Tax Payment Portal URL</label>
               <input placeholder="https://taxportal.county.gov/..." value={form.portal_url} onChange={e => setForm(p => ({ ...p, portal_url: e.target.value }))}
-                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
               <p className="text-xs text-muted-foreground mt-1">Adds a &quot;Pay Taxes&quot; button that opens this link.</p>
             </div>
           </div>
-          <div className="flex items-center gap-3">
+          <div className="flex items-center gap-3 pt-1">
             <button onClick={handleSubmit} disabled={saving}
-              className="flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-              {saving ? <span>...</span> : <Check className="h-4 w-4" />}
+              className="inline-flex items-center gap-1.5 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50 transition-colors">
+              <Check className="h-4 w-4" />
               {editId ? "Save Changes" : "Add Record"}
             </button>
-            <button onClick={resetForm} className="flex items-center gap-1.5 rounded-md border px-4 py-2 text-sm font-medium">
-              <X className="h-4 w-4" /> Cancel
+            <button onClick={resetForm} className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors">
+              Cancel
             </button>
           </div>
         </div>
       )}
 
-      {/* Tax Records List */}
-      {taxes.length === 0 && !showForm ? (
-        <div className="rounded-lg border bg-card py-10 text-center">
-          <Landmark className="h-12 w-12 mx-auto text-muted-foreground mb-3" />
-          <p className="text-sm text-muted-foreground">No tax records yet. Add one to track county taxes.</p>
-        </div>
-      ) : taxes.map(t => (
-        <div key={t.id} className="rounded-lg border bg-card p-5">
-          <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
-            <div><p className="text-xs text-muted-foreground uppercase">County</p><p className="text-sm font-semibold">{t.county || "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground uppercase">Tax Authority</p><p className="text-sm font-semibold">{t.tax_authority || "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground uppercase">Parcel ID</p><p className="text-sm font-semibold">{t.parcel_id || "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground uppercase">Annual Tax</p><p className="text-sm font-semibold">{t.annual_tax ? formatCurrency(t.annual_tax) : "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground uppercase">Frequency</p><p className="text-sm font-semibold">{t.payment_frequency || "—"}</p></div>
-            <div><p className="text-xs text-muted-foreground uppercase">Next Due</p><p className="text-sm font-semibold">{t.next_due_date ? new Date(t.next_due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"}</p></div>
+      {/* Empty state */}
+      {taxes.length === 0 && !showForm && (
+        <div className="rounded-lg border bg-card py-14 text-center">
+          <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
+            <Landmark className="h-7 w-7 text-muted-foreground" />
           </div>
-          <div className="flex items-center gap-3 mt-4 pt-3 border-t">
-            {t.portal_url && /^https?:\/\//.test(t.portal_url) ? (
+          <h3 className="mt-4 text-sm font-semibold text-foreground">No tax records yet</h3>
+          <p className="mt-1 text-sm text-muted-foreground max-w-sm mx-auto">
+            Add county tax details, due dates, and payment portal links to track property taxes.
+          </p>
+          <button onClick={() => setShowForm(true)}
+            className="mt-4 inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
+            <Plus className="h-4 w-4" /> Add Tax Record
+          </button>
+        </div>
+      )}
+
+      {/* Tax record cards */}
+      {taxes.map((t) => (
+        <div key={t.id} className="rounded-lg border bg-card overflow-hidden">
+          {/* Card header */}
+          <div className="flex items-center justify-between px-5 py-3.5 border-b bg-muted/30">
+            <div className="flex items-center gap-3 min-w-0">
+              <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                <Landmark className="h-4 w-4" />
+              </div>
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground truncate">{t.county || "Tax Record"}</p>
+                <p className="text-xs text-muted-foreground truncate">{t.tax_authority || "County tax"}</p>
+              </div>
+            </div>
+            <div className="flex items-center gap-1">
+              <button onClick={() => startEdit(t)} title="Edit tax record"
+                className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-primary transition-colors">
+                <Pencil className="h-4 w-4" />
+              </button>
+              <button onClick={() => handleDelete(t)} title="Delete tax record"
+                className="rounded-md p-2 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors">
+                <Trash2 className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+
+          {/* Card body */}
+          <div className="px-5 py-4">
+            <div className="grid grid-cols-2 md:grid-cols-4 gap-x-4 gap-y-4">
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Annual Tax</p>
+                <p className="mt-0.5 text-lg font-bold text-foreground">{t.annual_tax ? formatCurrency(t.annual_tax) : "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Parcel ID</p>
+                <p className="mt-0.5 text-sm font-medium text-foreground font-mono">{t.parcel_id || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Frequency</p>
+                <p className="mt-0.5 text-sm font-medium text-foreground">{t.payment_frequency || "—"}</p>
+              </div>
+              <div>
+                <p className="text-xs text-muted-foreground uppercase tracking-wider">Next Due</p>
+                <p className="mt-0.5 text-sm font-medium text-foreground">
+                  {t.next_due_date ? (
+                    <span className="inline-flex items-center gap-1.5">
+                      <CalendarClock className="h-3.5 w-3.5 text-muted-foreground" />
+                      {new Date(t.next_due_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" })}
+                    </span>
+                  ) : "—"}
+                </p>
+              </div>
+            </div>
+          </div>
+
+          {/* Card footer */}
+          <div className="flex items-center justify-between px-5 py-3 border-t bg-muted/20">
+            <p className="text-xs text-muted-foreground">
+              {t.portal_url ? "Payment portal available" : "No payment portal URL set"}
+            </p>
+            {t.portal_url && /^https?:\/\//.test(t.portal_url) && (
               <Link href={t.portal_url} target="_blank" rel="noopener noreferrer"
-                className="inline-flex items-center gap-2 rounded-md bg-[#00D632] px-4 py-2 text-sm font-bold text-white shadow-md hover:bg-[#00b82a] transition-colors">
+                className="inline-flex items-center gap-2 rounded-md bg-[#00D632] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#00b82a] hover:shadow-md transition-all">
                 <ExternalLink className="h-4 w-4" /> Pay Taxes
               </Link>
-            ) : (
-              <span className="text-xs text-muted-foreground">No payment portal URL set</span>
             )}
-            <button onClick={() => startEdit(t)}
-              className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">
-              <Pencil className="h-3.5 w-3.5" /> Edit
-            </button>
-            <button onClick={() => handleDelete(t)}
-              className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-xs font-medium text-red-600 hover:bg-red-50 transition-colors">
-              <Trash2 className="h-3.5 w-3.5" /> Delete
-            </button>
           </div>
         </div>
       ))}
