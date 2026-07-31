@@ -8,6 +8,7 @@ import { useInvestors, useCreateInvestor, useUpdateInvestor, useResetInvestorPas
 import { suggestPropertiesForEmail } from "@/lib/api/admin";
 import { useProperties } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 
 type Tab = "profile" | "security" | "notifications" | "appearance" | "investors";
 
@@ -326,7 +327,6 @@ function InvestorsTab() {
   const [showAddForm, setShowAddForm] = useState(false);
   const [editingId, setEditingId] = useState<string | null>(null);
   const [tempPassword, setTempPassword] = useState<string | null>(null);
-  const [confirmDelete, setConfirmDelete] = useState<string | null>(null);
 
   // Add form state
   const [newName, setNewName] = useState("");
@@ -419,7 +419,6 @@ function InvestorsTab() {
   const handleDelete = async (id: string) => {
     try {
       await deleteInvestor.mutateAsync(id);
-      setConfirmDelete(null);
     } catch {
       // error handled by query client
     }
@@ -614,7 +613,7 @@ function InvestorsTab() {
                   </div>
                 ) : (
                   /* ── Investor Row ── */
-                  <div className="flex items-center justify-between">
+                  <div className="group flex items-center justify-between">
                     <div className="flex-1 min-w-0">
                       <p className="text-sm font-semibold text-foreground">{investor.name}</p>
                       <p className="text-xs text-muted-foreground mt-0.5">{investor.email}</p>
@@ -624,46 +623,14 @@ function InvestorsTab() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1.5 shrink-0">
-                      <button
-                        onClick={() => startEditing(investor)}
-                        className="rounded-lg p-2 text-muted-foreground hover:text-foreground hover:bg-gray-100 transition-colors"
-                        title="Edit"
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </button>
-                      <button
-                        onClick={() => handleResetPassword(investor.id)}
-                        disabled={resetPassword.isPending}
-                        className="rounded-lg p-2 text-muted-foreground hover:text-amber-600 hover:bg-amber-50 transition-colors disabled:opacity-50"
-                        title="Reset Password"
-                      >
-                        <KeyRound className="h-4 w-4" />
-                      </button>
-                      {confirmDelete === investor.id ? (
-                        <div className="flex items-center gap-1.5">
-                          <button
-                            onClick={() => handleDelete(investor.id)}
-                            disabled={deleteInvestor.isPending}
-                            className="rounded-lg bg-red-600 px-3 py-2 text-xs font-semibold text-white hover:bg-red-700 transition-colors disabled:opacity-50"
-                          >
-                            {deleteInvestor.isPending ? "Deleting..." : "Confirm"}
-                          </button>
-                          <button
-                            onClick={() => setConfirmDelete(null)}
-                            className="rounded-lg border border-border px-3 py-2 text-xs font-medium text-muted-foreground hover:bg-gray-50 transition-colors"
-                          >
-                            Cancel
-                          </button>
-                        </div>
-                      ) : (
-                        <button
-                          onClick={() => setConfirmDelete(investor.id)}
-                          className="rounded-lg p-2 text-muted-foreground hover:text-red-600 hover:bg-red-50 transition-colors"
-                          title="Remove"
-                        >
-                          <Trash2 className="h-4 w-4" />
-                        </button>
-                      )}
+                      <ActionsMenu
+                        label={`${investor.name}`}
+                        actions={[
+                          { label: "Edit Investor", icon: <Pencil className="h-4 w-4" />, onClick: () => startEditing(investor) },
+                          { label: "Reset Password", icon: <KeyRound className="h-4 w-4" />, onClick: () => handleResetPassword(investor.id) },
+                          { label: "Remove", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: () => handleDelete(investor.id) },
+                        ]}
+                      />
                     </div>
                   </div>
                 )}

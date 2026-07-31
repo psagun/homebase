@@ -7,6 +7,7 @@ import { useProperty, useUpdateProperty, useDeleteProperty } from "@/lib/hooks/u
 import { recordPropertyView } from "@/lib/hooks/useRecentlyViewed";
 import { PropertyTabs } from "@/components/properties/PropertyTabs";
 import { EditPropertySheet } from "@/components/properties/EditPropertySheet";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { useRouter } from "next/navigation";
@@ -40,7 +41,6 @@ export default function PropertyLayout({ params, children }: { params: { id: str
   const updateProperty = useUpdateProperty();
   const deleteProperty = useDeleteProperty();
   const [showEditSheet, setShowEditSheet] = useState(false);
-  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
 
   // Record this property view for the recent list — must be before any early returns
   useEffect(() => {
@@ -96,38 +96,13 @@ export default function PropertyLayout({ params, children }: { params: { id: str
           </div>
         </div>
         <div className="flex items-center gap-2">
-          <button
-            onClick={() => setShowEditSheet(true)}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-          >
-            <Edit3 className="h-4 w-4" />
-            Edit
-          </button>
-          {!showDeleteConfirm ? (
-            <button
-              onClick={() => setShowDeleteConfirm(true)}
-              className="flex items-center gap-1.5 rounded-md border border-red-200 px-3 py-1.5 text-sm font-medium text-red-600 hover:bg-red-50 transition-colors"
-            >
-              <Trash2 className="h-4 w-4" />
-              Archive
-            </button>
-          ) : (
-            <div className="flex items-center gap-2">
-              <span className="text-sm text-red-600">Sure?</span>
-              <button
-                onClick={handleDelete}
-                className="rounded-md bg-red-600 px-3 py-1.5 text-sm font-medium text-white hover:bg-red-700 transition-colors"
-              >
-                Yes
-              </button>
-              <button
-                onClick={() => setShowDeleteConfirm(false)}
-                className="rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors"
-              >
-                No
-              </button>
-            </div>
-          )}
+          <ActionsMenu
+            label="Property"
+            actions={[
+              { label: "Edit Property", icon: <Edit3 className="h-4 w-4" />, onClick: () => setShowEditSheet(true) },
+              { label: "Archive", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: handleDelete },
+            ]}
+          />
         </div>
       </div>
 

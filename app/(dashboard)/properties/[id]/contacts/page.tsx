@@ -9,6 +9,7 @@ import { usePropertyContacts, useCreateContact, useUpdateContact, useDeleteConta
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { CONTACT_TYPES } from "@/lib/constants";
 import type { ContactData } from "@/lib/api/contacts";
 
@@ -346,7 +347,7 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
       {contacts && contacts.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
           {sortedContacts.map((c) => (
-            <div key={c.id} className="rounded-lg border bg-card overflow-hidden">
+            <div key={c.id} className="group rounded-lg border bg-card overflow-hidden">
               {/* Card header */}
               <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
                 <div className="flex items-center gap-2.5 min-w-0">
@@ -363,21 +364,18 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
                   <button onClick={() => toggleFavorite(c)} title={c.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                    aria-label={c.is_favorite ? `Remove ${c.name} from favorites` : `Add ${c.name} to favorites`}
                     className={`rounded-md p-1.5 transition-colors ${c.is_favorite ? "text-amber-400 hover:bg-background" : "text-muted-foreground hover:bg-background hover:text-amber-400"}`}>
                     <Star className={`h-4 w-4 ${c.is_favorite ? "fill-amber-400" : ""}`} />
                   </button>
-                  <button onClick={() => startEdit(c)} title="Edit contact"
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-primary transition-colors">
-                    <Pencil className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => handleUnlink(c)} title="Unlink from property"
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-amber-600 transition-colors">
-                    <Link2Off className="h-4 w-4" />
-                  </button>
-                  <button onClick={() => handleDelete(c)} title="Delete contact"
-                    className="rounded-md p-1.5 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors">
-                    <Trash2 className="h-4 w-4" />
-                  </button>
+                  <ActionsMenu
+                    label={`${c.name}`}
+                    actions={[
+                      { label: "Edit Contact", icon: <Pencil className="h-4 w-4" />, onClick: () => startEdit(c) },
+                      { label: "Unlink from Property", icon: <Link2Off className="h-4 w-4" />, onClick: () => handleUnlink(c) },
+                      { label: "Delete", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: () => handleDelete(c) },
+                    ]}
+                  />
                 </div>
               </div>
 

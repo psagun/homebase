@@ -8,6 +8,7 @@ import {
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { formatCurrency } from "@/lib/utils";
 
 interface TaxData {
@@ -261,7 +262,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
 
       {/* Tax record cards */}
       {taxes.map((t) => (
-        <div key={t.id} className="rounded-lg border bg-card overflow-hidden">
+        <div key={t.id} className="group rounded-lg border bg-card overflow-hidden">
           {/* Card header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b bg-muted/30">
             <div className="flex items-center gap-3 min-w-0">
@@ -273,16 +274,13 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
                 <p className="text-xs text-muted-foreground truncate">{t.tax_authority || "County tax"}</p>
               </div>
             </div>
-            <div className="flex items-center gap-1">
-              <button onClick={() => startEdit(t)} title="Edit tax record"
-                className="rounded-md p-2 text-muted-foreground hover:bg-background hover:text-primary transition-colors">
-                <Pencil className="h-4 w-4" />
-              </button>
-              <button onClick={() => handleDelete(t)} title="Delete tax record"
-                className="rounded-md p-2 text-muted-foreground hover:bg-red-50 hover:text-red-600 transition-colors">
-                <Trash2 className="h-4 w-4" />
-              </button>
-            </div>
+            <ActionsMenu
+              label={`${t.county || "Tax record"}`}
+              actions={[
+                { label: "Edit Record", icon: <Pencil className="h-4 w-4" />, onClick: () => startEdit(t) },
+                { label: "Delete", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: () => handleDelete(t) },
+              ]}
+            />
           </div>
 
           {/* Card body */}
