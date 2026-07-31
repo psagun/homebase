@@ -44,6 +44,26 @@ def create_tax(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user)
     t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(PropertyTax, k)})
     db.add(t); db.commit(); return t
 
+@router.patch("/properties/{property_id}/taxes/{tax_id}")
+def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    tax = db.query(PropertyTax).filter(PropertyTax.id == tax_id, PropertyTax.property_id == property_id).first()
+    if not tax:
+        raise HTTPException(404, "Tax record not found")
+    for k, v in data.items():
+        if hasattr(PropertyTax, k) and k != "id" and k != "property_id":
+            setattr(tax, k, v)
+    db.commit(); db.refresh(tax)
+    return tax
+
+@router.delete("/properties/{property_id}/taxes/{tax_id}", status_code=204)
+def delete_tax(property_id: uuid.UUID, tax_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    tax = db.query(PropertyTax).filter(PropertyTax.id == tax_id, PropertyTax.property_id == property_id).first()
+    if not tax:
+        raise HTTPException(404, "Tax record not found")
+    db.delete(tax); db.commit()
+
 @router.get("/properties/{property_id}/tenants")
 def list_tenants(property_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)

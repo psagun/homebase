@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { DollarSign, CalendarCheck, FileText, ShieldCheck, Wrench, Plus, Landmark, ExternalLink, Building2 } from "lucide-react";
+import { DollarSign, CalendarCheck, FileText, ShieldCheck, Wrench, Plus, Landmark, ExternalLink, Building2, Receipt } from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -17,10 +17,15 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
     Promise.all([
       fetch(`/api/v1/properties/${id}/mortgage`, { credentials: "include" }).then(r => r.json()).catch(() => null),
       fetch(`/api/v1/properties/${id}/insurance`, { credentials: "include" }).then(r => r.json()).catch(() => null),
-    ]).then(([mortgage, insurance]) => {
+      fetch(`/api/v1/properties/${id}/taxes`, { credentials: "include" }).then(r => r.json()).catch(() => null),
+    ]).then(([mortgage, insurance, taxes]) => {
       const links: { label: string; url: string; icon: React.ReactNode }[] = [];
       if (mortgage?.portal_url) links.push({ label: "Pay Mortgage", url: mortgage.portal_url, icon: <Landmark className="h-4 w-4" /> });
       if (insurance?.portal_url) links.push({ label: "Pay Insurance", url: insurance.portal_url, icon: <ShieldCheck className="h-4 w-4" /> });
+      if (Array.isArray(taxes)) {
+        const tax = taxes.find((t: any) => t?.portal_url);
+        if (tax?.portal_url) links.push({ label: "Pay Taxes", url: tax.portal_url, icon: <Receipt className="h-4 w-4" /> });
+      }
       setPaymentLinks(links);
     });
   }, [id]);
