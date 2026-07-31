@@ -3,7 +3,7 @@
 import { useEffect, useState } from "react";
 import {
   Plus, Pencil, Trash2, Phone, Mail, Globe, X, Check,
-  Link2, Link2Off, Search, StickyNote, Users,
+  Link2, Link2Off, Search, StickyNote, Users, Star, AlertCircle,
 } from "lucide-react";
 import { usePropertyContacts, useCreateContact, useUpdateContact, useDeleteContact, useLinkContactToProperty, useUnlinkContactFromProperty, useContacts } from "@/lib/hooks/useContacts";
 import { useProperty } from "@/lib/hooks/useProperties";
@@ -42,6 +42,39 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const [showLinkPicker, setShowLinkPicker] = useState(false);
   const [linkSearch, setLinkSearch] = useState("");
+  const [selectedForLink, setSelectedForLink] = useState<string[]>([]);
+
+  // Quick-add types
+  const QUICK_TYPES = ["Mortgage Lender", "Contractor", "Insurance Agent", "Tenant", "Property Manager", "Realtor"];
+
+  const quickAdd = (type: string) => {
+    setForm({ ...EMPTY_FORM, contact_type: type });
+    setEditId(null);
+    setShowForm(true);
+  };
+
+  const toggleFavorite = async (c: ContactData) => {
+    try {
+      await updateContact.mutateAsync({ id: c.id, data: { is_favorite: !c.is_favorite } });
+    } catch { /* handled by query client */ }
+  };
+
+  const toggleLinkSelect = (cid: string) => {
+    setSelectedForLink((prev) =>
+      prev.includes(cid) ? prev.filter((x) => x !== cid) : [...prev, cid]
+    );
+  };
+
+  const linkSelected = async () => {
+    for (const cid of selectedForLink) {
+      await linkContact.mutateAsync({ contactId: cid, propertyId: id });
+    }
+    setSelectedForLink([]);
+    setShowLinkPicker(false);
+    setLinkSearch("");
+    setMsg({ text: `${selectedForLink.length} contact${selectedForLink.length > 1 ? "s" : ""} linked`, ok: true });
+    setTimeout(() => setMsg(null), 2500);
+  };
 
   useEffect(() => {
     if (!showForm) return;
@@ -109,6 +142,18 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
   const linkedIds = new Set((contacts || []).map((c) => c.id));
   const unlinked = (allContacts || []).filter((c) => !linkedIds.has(c.id));
 
+  // Duplicate detection: same email exists elsewhere in the directory
+  const duplicateEmail = form.email.trim()
+    ? (allContacts || []).find(
+        (c) => c.email?.toLowerCase() === form.email.trim().toLowerCase() && c.id !== editId
+      )
+    : null;
+
+  // Favorites first
+  const sortedContacts = [...(contacts || [])].sort((a, b) =>
+    Number(b.is_favorite || false) - Number(a.is_favorite || false)
+  );
+
   return (
     <div className="space-y-6">
       {/* Header */}
@@ -137,6 +182,19 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
         </div>
       )}
 
+      {/* Quick-add type shortcuts */}
+      {!showForm && !showLinkPicker && (
+        <div className="flex flex-wrap items-center gap-2">
+          <span className="text-xs text-muted-foreground mr-1">Quick add:</span>
+          {QUICK_TYPES.map((type) => (
+            <button key={type} onClick={() => quickAdd(type)}
+              className="inline-flex items-center gap-1 rounded-full border px-3 py-1 text-xs font-medium hover:bg-muted transition-colors">
+              <Plus className="h-3 w-3" /> {type}
+            </button>
+          ))}
+        </div>
+      )}
+
       {/* Link picker */}
       {showLinkPicker && (
         <div className="rounded-lg border bg-card p-5 space-y-3">
@@ -158,8 +216,12 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
                 {unlinked.length === 0 ? "All your contacts are already linked." : "No matching contacts."}
               </p>
             ) : unlinked.filter((c) => c.name.toLowerCase().includes(linkSearch.toLowerCase())).map((c) => (
-              <div key={c.id} className="flex items-center justify-between px-3 py-2 rounded-md hover:bg-muted/60 transition-colors">
-                <div className="flex items-center gap-2 min-w-0">
+              <div key={c.id}
+                className={`flex items-center justify-between px-3 py-2 rounded-md transition-colors ${selectedForLink.includes(c.id) ? "bg-primary/10" : "hover:bg-muted/60"}`}>
+                <label className="flex items-center gap-2 min-w-0 cursor-pointer flex-1">
+                  <input type="checkbox" checked={selectedForLink.includes(c.id)}
+                    onChange={() => toggleLinkSelect(c.id)}
+                    className="h-4 w-4 rounded border-gray-300 text-primary" />
                   <div className="flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
                     {c.name.charAt(0)}
                   </div>
@@ -167,7 +229,7 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
                     <p className="text-sm font-medium truncate">{c.name}</p>
                     <p className="text-xs text-muted-foreground truncate">{c.company || c.email || c.contact_type}</p>
                   </div>
-                </div>
+                </label>
                 <button onClick={async () => {
                   await linkContact.mutateAsync({ contactId: c.id, propertyId: id });
                   setShowLinkPicker(false);
@@ -175,12 +237,18 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
                   setMsg({ text: `${c.name} linked`, ok: true });
                   setTimeout(() => setMsg(null), 2500);
                 }}
-                  className="inline-flex items-center gap-1 rounded-md bg-primary px-3 py-1.5 text-xs font-medium text-white hover:bg-primary/90">
+                  className="inline-flex items-center gap-1 rounded-md border px-2.5 py-1 text-xs font-medium hover:bg-muted shrink-0">
                   <Link2 className="h-3 w-3" /> Link
                 </button>
               </div>
             ))}
           </div>
+          {selectedForLink.length > 0 && (
+            <button onClick={linkSelected}
+              className="w-full inline-flex items-center justify-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90">
+              <Link2 className="h-4 w-4" /> Link {selectedForLink.length} Selected
+            </button>
+          )}
         </div>
       )}
 
@@ -219,7 +287,14 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Email</label>
               <input type="email" value={form.email} onChange={(e) => setForm(p => ({ ...p, email: e.target.value }))}
-                placeholder="name@example.com" className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary" />
+                placeholder="name@example.com"
+                className={`w-full rounded-md border bg-background px-3 py-2 text-sm outline-none focus:border-primary ${duplicateEmail ? "border-amber-400" : ""}`} />
+              {duplicateEmail && (
+                <p className="flex items-center gap-1 mt-1 text-xs text-amber-600">
+                  <AlertCircle className="h-3 w-3 shrink-0" />
+                  Duplicate: already exists as {duplicateEmail.name}
+                </p>
+              )}
             </div>
             <div>
               <label className="block text-xs font-medium text-muted-foreground mb-1">Website</label>
@@ -270,7 +345,7 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
       {/* Contact cards */}
       {contacts && contacts.length > 0 && (
         <div className="grid gap-3 sm:grid-cols-2">
-          {contacts.map((c) => (
+          {sortedContacts.map((c) => (
             <div key={c.id} className="rounded-lg border bg-card overflow-hidden">
               {/* Card header */}
               <div className="flex items-center justify-between px-4 py-3 border-b bg-muted/30">
@@ -279,11 +354,18 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
                     {c.name.charAt(0)}
                   </div>
                   <div className="min-w-0">
-                    <p className="text-sm font-semibold truncate">{c.name}</p>
+                    <p className="text-sm font-semibold truncate flex items-center gap-1.5">
+                      {c.name}
+                      {c.is_favorite && <Star className="h-3.5 w-3.5 fill-amber-400 text-amber-400" />}
+                    </p>
                     <p className="text-xs text-muted-foreground truncate">{c.company || c.contact_type}</p>
                   </div>
                 </div>
                 <div className="flex items-center gap-0.5 shrink-0">
+                  <button onClick={() => toggleFavorite(c)} title={c.is_favorite ? "Remove from favorites" : "Add to favorites"}
+                    className={`rounded-md p-1.5 transition-colors ${c.is_favorite ? "text-amber-400 hover:bg-background" : "text-muted-foreground hover:bg-background hover:text-amber-400"}`}>
+                    <Star className={`h-4 w-4 ${c.is_favorite ? "fill-amber-400" : ""}`} />
+                  </button>
                   <button onClick={() => startEdit(c)} title="Edit contact"
                     className="rounded-md p-1.5 text-muted-foreground hover:bg-background hover:text-primary transition-colors">
                     <Pencil className="h-4 w-4" />

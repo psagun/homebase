@@ -1,7 +1,9 @@
 "use client";
 
-import { useState, type FormEvent } from "react";
+import { useState, useEffect, type FormEvent } from "react";
 import type { MortgageCreateData, MortgageData } from "@/lib/api/mortgage";
+import { listContacts } from "@/lib/api/contacts";
+import { UserCheck } from "lucide-react";
 
 interface MortgageFormProps {
   initialData?: MortgageData;
@@ -12,6 +14,27 @@ interface MortgageFormProps {
 
 export function MortgageForm({ initialData, onSubmit, isLoading, onCancel }: MortgageFormProps) {
   const [lenderName, setLenderName] = useState(initialData?.lender_name || "");
+  const [lenderContacts, setLenderContacts] = useState<{ id: string; name: string; company?: string | null; phone?: string | null; email?: string | null }[]>([]);
+  const [suggestions, setSuggestions] = useState<typeof lenderContacts>([]);
+
+  // Load lender contacts for smart suggestions
+  useEffect(() => {
+    listContacts("Mortgage Lender")
+      .then((cs) => setLenderContacts(cs))
+      .catch(() => {});
+  }, []);
+
+  // Suggest matching lender contacts as the user types
+  useEffect(() => {
+    const q = lenderName.trim().toLowerCase();
+    if (!q || q.length < 2) { setSuggestions([]); return; }
+    const matches = lenderContacts.filter(
+      (c) =>
+        c.name.toLowerCase().includes(q) ||
+        (c.company || "").toLowerCase().includes(q)
+    ).slice(0, 3);
+    setSuggestions(matches);
+  }, [lenderName, lenderContacts]);
   const [loanNumber, setLoanNumber] = useState(initialData?.loan_number || "");
   const [loanType, setLoanType] = useState(initialData?.loan_type || "Fixed 30yr");
   const [interestRate, setInterestRate] = useState(initialData?.interest_rate?.toString() || "");
@@ -70,6 +93,31 @@ export function MortgageForm({ initialData, onSubmit, isLoading, onCancel }: Mor
           <label className="block text-sm font-medium mb-1">Lender Name *</label>
           <input type="text" required value={lenderName} onChange={e => setLenderName(e.target.value)}
             className="w-full rounded-md border px-3 py-2 text-sm focus:border-primary focus:outline-none" placeholder="e.g. Rocket Mortgage" />
+          {suggestions.length > 0 && (
+            <div className="mt-2 space-y-1.5">
+              <p className="text-xs text-muted-foreground flex items-center gap-1">
+                <UserCheck className="h-3 w-3" /> Lender contacts found — click to use their details
+              </p>
+              {suggestions.map((c) => (
+                <button key={c.id} type="button"
+                  onClick={() => {
+                    setLenderName(c.name);
+                    if (c.company && !portalUrl) {
+                      // Best-effort: keep portal URL untouched, just fill the name
+                    }
+                    setSuggestions([]);
+                  }}
+                  className="flex w-full items-center justify-between rounded-md border bg-muted/30 px-3 py-2 text-left text-sm hover:bg-muted transition-colors">
+                  <span className="flex items-center gap-2 min-w-0">
+                    <UserCheck className="h-4 w-4 text-primary shrink-0" />
+                    <span className="truncate">{c.name}</span>
+                    {c.company && <span className="text-xs text-muted-foreground truncate">— {c.company}</span>}
+                  </span>
+                  {c.phone && <span className="text-xs text-muted-foreground shrink-0">{c.phone}</span>}
+                </button>
+              ))}
+            </div>
+          )}
         </div>
         <div>
           <label className="block text-sm font-medium mb-1">Loan Number</label>

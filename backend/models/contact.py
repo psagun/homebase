@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime, timezone
 
-from sqlalchemy import Column, String, Text, DateTime, ForeignKey, Enum as SAEnum, Table
+from sqlalchemy import Boolean, Column, String, Text, DateTime, ForeignKey, Enum as SAEnum, Table
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import relationship
 import enum
@@ -46,6 +46,7 @@ class Contact(Base):
     website = Column(String(500), nullable=True)
     notes = Column(Text, nullable=True)
     contact_type = Column(SAEnum(ContactType), nullable=False, default=ContactType.OTHER)
+    is_favorite = Column(Boolean, default=False, nullable=False)
 
     created_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc))
     updated_at = Column(DateTime(timezone=True), default=lambda: datetime.now(timezone.utc), onupdate=lambda: datetime.now(timezone.utc))

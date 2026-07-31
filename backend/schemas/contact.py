@@ -13,6 +13,7 @@ class ContactCreate(BaseModel):
     website: Optional[str] = None
     notes: Optional[str] = None
     contact_type: str = "Other"
+    is_favorite: bool = False
     property_ids: Optional[list[str]] = None
 
 
@@ -24,6 +25,7 @@ class ContactUpdate(BaseModel):
     website: Optional[str] = None
     notes: Optional[str] = None
     contact_type: Optional[str] = None
+    is_favorite: Optional[bool] = None
 
 
 class ContactResponse(BaseModel):
@@ -36,6 +38,7 @@ class ContactResponse(BaseModel):
     website: Optional[str] = None
     notes: Optional[str] = None
     contact_type: str
+    is_favorite: bool = False
     created_at: datetime
     updated_at: datetime
     property_ids: Optional[list[str]] = None

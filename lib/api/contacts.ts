@@ -10,6 +10,7 @@ export interface ContactData {
   website?: string | null;
   notes?: string | null;
   contact_type: string;
+  is_favorite?: boolean;
   created_at: string;
   updated_at: string;
   property_ids?: string[] | null;
@@ -23,6 +24,7 @@ export interface ContactCreateData {
   website?: string;
   notes?: string;
   contact_type?: string;
+  is_favorite?: boolean;
   property_ids?: string[];
 }
 
