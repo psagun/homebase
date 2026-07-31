@@ -12,7 +12,7 @@ import {
   Check,
   Landmark,
 } from "lucide-react";
-import { usePropertyOwnership, useEntities, useCreateEntity, useSetPropertyEntity, useRemovePropertyEntity } from "@/lib/hooks/useOwnership";
+import { usePropertyOwnership, useEntities, useCreateEntity, useUpdateEntity, useSetPropertyEntity, useRemovePropertyEntity } from "@/lib/hooks/useOwnership";
 import { useAddEntityInvestor, useUpdateEntityInvestor, useRemoveEntityInvestor } from "@/lib/hooks/useOwnership";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
@@ -24,13 +24,18 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
   const { data: ownership, isLoading, isError, refetch } = usePropertyOwnership(id);
   const { data: entities } = useEntities();
   const createEntity = useCreateEntity();
+  const updateEntity = useUpdateEntity();
   const setEntity = useSetPropertyEntity(id);
   const removeEntity = useRemovePropertyEntity(id);
 
   const [showEntitySelector, setShowEntitySelector] = useState(false);
   const [showNewEntityForm, setShowNewEntityForm] = useState(false);
+  const [editEntityMode, setEditEntityMode] = useState(false);
   const [selectedEntityId, setSelectedEntityId] = useState("");
   const [newEntityName, setNewEntityName] = useState("");
+  const [newEntityType, setNewEntityType] = useState("");
+  const [newEntityEin, setNewEntityEin] = useState("");
+  const [newEntityState, setNewEntityState] = useState("");
 
   if (isLoading) return <LoadingState text="Loading ownership info..." />;
   if (isError) return <ErrorState title="Failed to load ownership" onRetry={() => refetch()} />;
@@ -45,10 +50,31 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
 
   const handleCreateAndAssign = async () => {
     if (!newEntityName.trim()) return;
-    const entity = await createEntity.mutateAsync({ name: newEntityName.trim() });
+    const entity = await createEntity.mutateAsync({
+      name: newEntityName.trim(),
+      entity_type: newEntityType.trim() || undefined,
+      ein: newEntityEin.trim() || undefined,
+      state_of_formation: newEntityState.trim() || undefined,
+    });
     await setEntity.mutateAsync(entity.id);
     setShowNewEntityForm(false);
-    setNewEntityName("");
+    setNewEntityName(""); setNewEntityType(""); setNewEntityEin(""); setNewEntityState("");
+    refetch();
+  };
+
+  const handleEditEntity = async () => {
+    if (!ownership?.entity) return;
+    await updateEntity.mutateAsync({
+      id: ownership.entity.id,
+      data: {
+        name: newEntityName.trim() || undefined,
+        entity_type: newEntityType.trim() || undefined,
+        ein: newEntityEin.trim() || undefined,
+        state_of_formation: newEntityState.trim() || undefined,
+      },
+    });
+    setEditEntityMode(false);
+    setNewEntityName(""); setNewEntityType(""); setNewEntityEin(""); setNewEntityState("");
     refetch();
   };
 
@@ -100,9 +126,8 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
               </button>
             )}
           </div>
-        ) : (
-          /* Business Entity Details */
-          ownership?.entity && (
+        ) : ownership?.entity && !editEntityMode ? (
+          <div>
             <div className="grid grid-cols-2 md:grid-cols-4 gap-4">
               <div>
                 <p className="text-xs text-muted-foreground uppercase font-semibold">Entity Name</p>
@@ -130,7 +155,65 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
                 </p>
               </div>
             </div>
-          )
+            <button onClick={() => {
+              setEditEntityMode(true);
+              setNewEntityName(ownership.entity!.name);
+              setNewEntityType(ownership.entity!.entity_type || "");
+              setNewEntityEin(ownership.entity!.ein || "");
+              setNewEntityState(ownership.entity!.state_of_formation || "");
+            }}
+              className="mt-4 flex items-center gap-1.5 text-sm text-primary hover:underline">
+              <Pencil className="h-3.5 w-3.5" /> Edit Entity Details
+            </button>
+          </div>
+        ) : null}
+
+        {/* Inline Edit Entity Form */}
+        {editEntityMode && ownership?.entity && (
+          <div className="mt-4 space-y-3 border-t pt-4">
+            <h4 className="text-sm font-semibold">Edit Entity Details</h4>
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+              <div>
+                <label className="block text-xs font-medium mb-1">Entity Name</label>
+                <input type="text" value={newEntityName} onChange={(e) => setNewEntityName(e.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">Entity Type</label>
+                <select value={newEntityType} onChange={(e) => setNewEntityType(e.target.value)}
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none">
+                  <option value="">Select type...</option>
+                  <option value="LLC">LLC</option>
+                  <option value="Corporation">Corporation</option>
+                  <option value="Partnership">Partnership</option>
+                  <option value="Trust">Trust</option>
+                  <option value="LLP">LLP</option>
+                  <option value="Sole Proprietorship">Sole Proprietorship</option>
+                  <option value="Other">Other</option>
+                </select>
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">EIN</label>
+                <input type="text" value={newEntityEin} onChange={(e) => setNewEntityEin(e.target.value)}
+                  placeholder="XX-XXXXXXX"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+              </div>
+              <div>
+                <label className="block text-xs font-medium mb-1">State of Formation</label>
+                <input type="text" value={newEntityState} onChange={(e) => setNewEntityState(e.target.value)}
+                  placeholder="e.g. Delaware"
+                  className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+              </div>
+            </div>
+            <div className="flex items-center gap-3">
+              <button onClick={handleEditEntity} disabled={!newEntityName.trim()}
+                className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                Save Changes
+              </button>
+              <button onClick={() => { setEditEntityMode(false); setNewEntityName(""); setNewEntityType(""); setNewEntityEin(""); setNewEntityState(""); }}
+                className="rounded-md border px-3 py-2 text-sm font-medium">Cancel</button>
+            </div>
+          </div>
         )}
 
         {/* Entity Selector */}
@@ -163,16 +246,49 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
                   <Plus className="h-3.5 w-3.5" /> Create new entity
                 </button>
               ) : (
-                <div className="flex items-center gap-3">
-                  <input type="text" value={newEntityName} onChange={(e) => setNewEntityName(e.target.value)}
-                    placeholder="Entity name"
-                    className="rounded-md border bg-background px-3 py-2 text-sm outline-none flex-1 max-w-md" />
-                  <button onClick={handleCreateAndAssign} disabled={!newEntityName.trim() || createEntity.isPending}
-                    className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
-                    Create & Assign
-                  </button>
-                  <button onClick={() => setShowNewEntityForm(false)}
-                    className="rounded-md border px-3 py-2 text-sm font-medium">Cancel</button>
+                <div className="space-y-3">
+                  <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-3">
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Entity Name *</label>
+                      <input type="text" value={newEntityName} onChange={(e) => setNewEntityName(e.target.value)}
+                        placeholder="Entity name"
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">Entity Type</label>
+                      <select value={newEntityType} onChange={(e) => setNewEntityType(e.target.value)}
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none">
+                        <option value="">Select type...</option>
+                        <option value="LLC">LLC</option>
+                        <option value="Corporation">Corporation</option>
+                        <option value="Partnership">Partnership</option>
+                        <option value="Trust">Trust</option>
+                        <option value="LLP">LLP</option>
+                        <option value="Sole Proprietorship">Sole Proprietorship</option>
+                        <option value="Other">Other</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">EIN</label>
+                      <input type="text" value={newEntityEin} onChange={(e) => setNewEntityEin(e.target.value)}
+                        placeholder="XX-XXXXXXX"
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-medium mb-1">State of Formation</label>
+                      <input type="text" value={newEntityState} onChange={(e) => setNewEntityState(e.target.value)}
+                        placeholder="e.g. Delaware"
+                        className="w-full rounded-md border bg-background px-3 py-2 text-sm outline-none" />
+                    </div>
+                  </div>
+                  <div className="flex items-center gap-3">
+                    <button onClick={handleCreateAndAssign} disabled={!newEntityName.trim() || createEntity.isPending}
+                      className="rounded-md bg-primary px-4 py-2 text-sm font-medium text-white disabled:opacity-50">
+                      {createEntity.isPending ? "Creating..." : "Create & Assign"}
+                    </button>
+                    <button onClick={() => { setShowNewEntityForm(false); setNewEntityType(""); setNewEntityEin(""); setNewEntityState(""); }}
+                      className="rounded-md border px-3 py-2 text-sm font-medium">Cancel</button>
+                  </div>
                 </div>
               )}
             </div>
