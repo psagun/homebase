@@ -28,6 +28,19 @@ router = APIRouter(tags=["ownership"])
 
 
 def _get_property(user_id: uuid.UUID, property_id: uuid.UUID, db: Session) -> Property:
+    from backend.models.property_investor import PropertyInvestor
+    # Check investor access first
+    link = db.query(PropertyInvestor).filter(
+        PropertyInvestor.property_id == property_id,
+        PropertyInvestor.user_id == user_id,
+    ).first()
+    if link:
+        prop = db.query(Property).filter(
+            Property.id == property_id,
+            Property.archived_at.is_(None),
+        ).first()
+        if prop:
+            return prop
     prop = db.query(Property).filter(
         Property.id == property_id,
         Property.user_id == user_id,
