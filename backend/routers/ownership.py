@@ -414,6 +414,8 @@ def set_property_ownership_entity(
     db: Session = Depends(get_db),
 ):
     """Set or change the ownership entity for a property."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
     from sqlalchemy import text
 
     prop = _get_property(current_user.id, property_id, db)
@@ -501,6 +503,8 @@ def remove_property_ownership_entity(
     db: Session = Depends(get_db),
 ):
     """Remove the ownership entity link from a property (reverts to Individual)."""
+    if current_user.role == "investor":
+        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
     prop = _get_property(current_user.id, property_id, db)
     prop.ownership_entity_id = None
     db.commit()
