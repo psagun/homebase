@@ -20,7 +20,7 @@ def _get_property_or_404(db: Session, user_id, property_id) -> Property:
         PropertyInvestor.user_id == user_id,
     ).first()
     if link:
-        prop = db.query(Property).filter(Property.id == property_id).first()
+        prop = db.query(Property).filter(Property.id == property_id, Property.archived_at.is_(None)).first()
         if prop:
             return prop
     prop = db.query(Property).filter(

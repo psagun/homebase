@@ -19,7 +19,7 @@ def _get_property_or_404(db: Session, user_id, property_id) -> Property:
         PropertyInvestor.user_id == user_id,
     ).first()
     if link:
-        prop = db.query(Property).filter(Property.id == property_id).first()
+        prop = db.query(Property).filter(Property.id == property_id, Property.archived_at.is_(None)).first()
         if prop:
             return prop
     prop = db.query(Property).filter(
@@ -154,7 +154,7 @@ def _sync_task_due_date(db: Session, user_id, property_id, due_date):
         task.due_date = due_date
     else:
         # Auto-create a mortgage payment task
-        prop = db.query(Property).filter(Property.id == property_id).first()
+        prop = db.query(Property).filter(Property.id == property_id, Property.archived_at.is_(None)).first()
         prop_name = prop.name if prop else "Property"
         task = Task(
             id=uuid.uuid4(),
