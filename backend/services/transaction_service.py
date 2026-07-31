@@ -13,6 +13,16 @@ from backend.models.property import Property
 
 
 def _get_property_or_404(db: Session, user_id, property_id) -> Property:
+    """Verify the user owns this property (checks direct ownership and PropertyInvestor)."""
+    from backend.models.property_investor import PropertyInvestor
+    link = db.query(PropertyInvestor).filter(
+        PropertyInvestor.property_id == property_id,
+        PropertyInvestor.user_id == user_id,
+    ).first()
+    if link:
+        prop = db.query(Property).filter(Property.id == property_id).first()
+        if prop:
+            return prop
     prop = db.query(Property).filter(
         Property.id == property_id, Property.user_id == user_id, Property.archived_at.is_(None),
     ).first()

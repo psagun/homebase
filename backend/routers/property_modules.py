@@ -13,40 +13,55 @@ from backend.models.maintenance_record import MaintenanceRecord
 router = APIRouter()
 MODEL_MAP = {"taxes": PropertyTax, "tenants": Tenant, "maintenance": MaintenanceRecord}
 
-def _get_prop(user_id, property_id, db):
-    prop = db.query(Property).filter(Property.id == property_id, Property.user_id == user_id, Property.archived_at.is_(None)).first()
-    if not prop: raise HTTPException(404, "Property not found")
-    return prop
+def _get_prop(user, property_id, db):
+    """Verify user has access to this property. Checks both direct ownership and PropertyInvestor."""
+    from backend.models.property_investor import PropertyInvestor
+    if user.role == "investor":
+        link = db.query(PropertyInvestor).filter(
+            PropertyInvestor.property_id == property_id,
+            PropertyInvestor.user_id == user.id,
+        ).first()
+        if not link:
+            raise HTTPException(404, "Property not found")
+    else:
+        prop = db.query(Property).filter(
+            Property.id == property_id,
+            Property.user_id == user.id,
+            Property.archived_at.is_(None),
+        ).first()
+        if not prop:
+            raise HTTPException(404, "Property not found")
+    return True
 
 @router.get("/properties/{property_id}/taxes")
 def list_taxes(property_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
-    _get_prop(cur.id, property_id, db)
+    _get_prop(cur, property_id, db)
     return db.query(PropertyTax).filter(PropertyTax.property_id == property_id).all()
 
 @router.post("/properties/{property_id}/taxes")
 def create_tax(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
-    _get_prop(cur.id, property_id, db)
+    _get_prop(cur, property_id, db)
     t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(PropertyTax, k)})
     db.add(t); db.commit(); return t
 
 @router.get("/properties/{property_id}/tenants")
 def list_tenants(property_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
-    _get_prop(cur.id, property_id, db)
+    _get_prop(cur, property_id, db)
     return db.query(Tenant).filter(Tenant.property_id == property_id).all()
 
 @router.post("/properties/{property_id}/tenants")
 def create_tenant(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
-    _get_prop(cur.id, property_id, db)
+    _get_prop(cur, property_id, db)
     t = Tenant(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(Tenant, k)})
     db.add(t); db.commit(); return t
 
 @router.get("/properties/{property_id}/maintenance")
 def list_maintenance(property_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
-    _get_prop(cur.id, property_id, db)
+    _get_prop(cur, property_id, db)
     return db.query(MaintenanceRecord).filter(MaintenanceRecord.property_id == property_id).order_by(MaintenanceRecord.date.desc()).all()
 
 @router.post("/properties/{property_id}/maintenance")
 def create_maintenance(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
-    _get_prop(cur.id, property_id, db)
+    _get_prop(cur, property_id, db)
     m = MaintenanceRecord(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(MaintenanceRecord, k)})
     db.add(m); db.commit(); return m
