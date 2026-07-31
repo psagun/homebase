@@ -49,3 +49,11 @@ export function deleteContact(id: string): Promise<void> {
 export function getPropertyContacts(propertyId: string): Promise<ContactData[]> {
   return api.get(`/contacts/property/${propertyId}`);
 }
+
+export function linkContactToProperty(contactId: string, propertyId: string): Promise<ContactData> {
+  return api.post(`/contacts/${contactId}/link/${propertyId}`);
+}
+
+export function unlinkContactFromProperty(contactId: string, propertyId: string): Promise<void> {
+  return api.delete(`/contacts/${contactId}/unlink/${propertyId}`);
+}

@@ -58,3 +58,22 @@ def property_contacts(
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
     return contact_service.get_contacts_for_property(db, current_user.id, property_id)
+
+
+@router.post("/{contact_id}/link/{property_id}", response_model=ContactResponse)
+def link_contact(
+    contact_id: uuid.UUID, property_id: uuid.UUID,
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    """Link an existing contact to a property."""
+    contact_service.link_contact_to_property(db, current_user.id, contact_id, property_id)
+    return contact_service.get_contact(db, current_user.id, contact_id)
+
+
+@router.delete("/{contact_id}/unlink/{property_id}", status_code=204)
+def unlink_contact(
+    contact_id: uuid.UUID, property_id: uuid.UUID,
+    current_user: User = Depends(get_current_user), db: Session = Depends(get_db),
+):
+    """Unlink a contact from a property (contact record is kept)."""
+    contact_service.unlink_contact(db, current_user.id, contact_id, property_id)
