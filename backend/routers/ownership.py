@@ -322,13 +322,37 @@ def remove_entity_investor(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """Remove an investor from an ownership entity."""
+    """Remove an investor from an ownership entity. Also cleans up PropertyInvestor links."""
+    from sqlalchemy import text
+
     link = db.query(OwnershipEntityInvestor).filter(
         OwnershipEntityInvestor.ownership_entity_id == entity_id,
         OwnershipEntityInvestor.investor_id == investor_id,
     ).first()
     if not link:
         raise HTTPException(status_code=404, detail="Investor not found in this entity")
+
+    # Get the investor's email to find their portal user
+    inv = db.query(Investor).filter(Investor.id == investor_id).first()
+
+    # Remove PropertyInvestor links for this entity's properties
+    if inv and inv.email:
+        portal_user = db.execute(
+            text("SELECT id FROM users WHERE email = :email AND role = 'investor'"),
+            {"email": inv.email},
+        ).first()
+        if portal_user:
+            db.execute(
+                text("""
+                    DELETE FROM property_investors
+                    WHERE user_id = :uid
+                    AND property_id IN (
+                        SELECT id FROM properties WHERE ownership_entity_id = :eid
+                    )
+                """),
+                {"uid": portal_user.id, "eid": entity_id},
+            )
+
     db.delete(link)
     db.commit()
 
@@ -505,6 +529,12 @@ def remove_property_ownership_entity(
     """Remove the ownership entity link from a property (reverts to Individual)."""
     if current_user.role == "investor":
         raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
+    from sqlalchemy import text
     prop = _get_property(current_user.id, property_id, db)
+    # Remove PropertyInvestor links for this property (cleanup)
+    db.execute(
+        text("DELETE FROM property_investors WHERE property_id = :pid"),
+        {"pid": property_id},
+    )
     prop.ownership_entity_id = None
     db.commit()
