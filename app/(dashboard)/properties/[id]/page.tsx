@@ -8,10 +8,62 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { formatCurrency } from "@/lib/utils";
 
+interface ReminderItem {
+  id: string;
+  title: string;
+  task_type: string;
+  due_date?: string | null;
+  status: string;
+}
+
+function dueDays(r: ReminderItem): number {
+  if (!r.due_date) return 0;
+  const d = new Date(r.due_date);
+  const now = new Date();
+  now.setHours(0, 0, 0, 0);
+  d.setHours(0, 0, 0, 0);
+  return Math.round((d.getTime() - now.getTime()) / 86400000);
+}
+
+function reminderIcon(r: ReminderItem): { icon: React.ReactNode; bg: string; color: string } {
+  const t = (r.task_type || "").toLowerCase();
+  if (t.includes("mortgage")) return { icon: <Landmark className="h-4 w-4" />, bg: "bg-blue-50 text-blue-600", color: "" };
+  if (t.includes("insurance")) return { icon: <ShieldCheck className="h-4 w-4" />, bg: "bg-purple-50 text-purple-600", color: "" };
+  if (t.includes("tax")) return { icon: <Receipt className="h-4 w-4" />, bg: "bg-amber-50 text-amber-600", color: "" };
+  if (t.includes("hoa")) return { icon: <Building2 className="h-4 w-4" />, bg: "bg-pink-50 text-pink-600", color: "" };
+  if (t.includes("rent")) return { icon: <DollarSign className="h-4 w-4" />, bg: "bg-emerald-50 text-emerald-600", color: "" };
+  if (t.includes("lease")) return { icon: <FileText className="h-4 w-4" />, bg: "bg-indigo-50 text-indigo-600", color: "" };
+  if (t.includes("maintenance")) return { icon: <Wrench className="h-4 w-4" />, bg: "bg-orange-50 text-orange-600", color: "" };
+  return { icon: <CalendarCheck className="h-4 w-4" />, bg: "bg-gray-100 text-gray-600", color: "" };
+}
+
 export default function PropertyOverviewPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property, isLoading, isError, refetch } = useProperty(id);
   const [paymentLinks, setPaymentLinks] = useState<{ label: string; url: string; icon: React.ReactNode }[]>([]);
+  const [reminders, setReminders] = useState<ReminderItem[]>([]);
+  const [remindersLoading, setRemindersLoading] = useState(true);
+
+  // Load this property's active tasks for the reminders section
+  useEffect(() => {
+    fetch(`/api/v1/tasks?property_id=${id}`, { credentials: "include" })
+      .then((r) => r.json())
+      .then((data: ReminderItem[]) => {
+        const active = (Array.isArray(data) ? data : []).filter(
+          (t) => t.status !== "Completed" && t.status !== "Dismissed"
+        );
+        // Sort: overdue first, then due today, then by due date
+        active.sort((a, b) => {
+          const rank = (t: ReminderItem) =>
+            t.status === "Overdue" ? 0 : t.status === "Due Today" ? 1 : 2;
+          if (rank(a) !== rank(b)) return rank(a) - rank(b);
+          return (a.due_date || "").localeCompare(b.due_date || "");
+        });
+        setReminders(active.slice(0, 5));
+      })
+      .catch(() => {})
+      .finally(() => setRemindersLoading(false));
+  }, [id]);
 
   useEffect(() => {
     Promise.all([
@@ -115,14 +167,39 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
       <div className="rounded-lg border bg-card p-5">
         <div className="flex items-center justify-between mb-3">
           <h2 className="text-base font-semibold">Upcoming Reminders</h2>
-          <span className="rounded-full bg-muted px-2.5 py-0.5 text-xs font-medium text-muted-foreground">
-            Coming in Phase 8
-          </span>
+          <Link href="/tasks" className="text-xs text-primary font-medium hover:underline">View all</Link>
         </div>
-        <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
-          <CalendarCheck className="mr-2 h-5 w-5" />
-          No upcoming reminders
-        </div>
+        {remindersLoading ? (
+          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            <span className="h-5 w-5 animate-spin rounded-full border-2 border-primary border-t-transparent" />
+          </div>
+        ) : reminders.length === 0 ? (
+          <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
+            <CalendarCheck className="mr-2 h-5 w-5" />
+            No upcoming reminders
+          </div>
+        ) : (
+          <div className="space-y-2">
+            {reminders.map((r) => (
+              <Link
+                key={r.id}
+                href="/tasks"
+                className="flex items-center gap-3 rounded-md border px-3 py-2.5 hover:bg-muted/50 transition-colors"
+              >
+                <div className={`flex h-8 w-8 shrink-0 items-center justify-center rounded-md ${reminderIcon(r).bg} ${reminderIcon(r).color}`}>
+                  {reminderIcon(r).icon}
+                </div>
+                <div className="min-w-0 flex-1">
+                  <p className="text-sm font-medium truncate">{r.title}</p>
+                  <p className="text-xs text-muted-foreground">{r.task_type}</p>
+                </div>
+                <span className={`shrink-0 text-xs font-medium ${r.status === "Overdue" ? "text-red-600" : r.status === "Due Today" ? "text-amber-600" : "text-muted-foreground"}`}>
+                  {r.status === "Overdue" ? `${dueDays(r)}d overdue` : r.status === "Due Today" ? "Due today" : dueDays(r) === 0 ? "Due today" : `Due in ${dueDays(r)}d`}
+                </span>
+              </Link>
+            ))}
+          </div>
+        )}
       </div>
 
       {/* Quick Actions */}
