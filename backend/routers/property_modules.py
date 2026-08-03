@@ -98,3 +98,27 @@ def create_maintenance(property_id: uuid.UUID, data: dict, cur=Depends(get_curre
     _get_prop(cur, property_id, db)
     m = MaintenanceRecord(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(MaintenanceRecord, k)})
     db.add(m); db.commit(); return m
+
+@router.patch("/properties/{property_id}/maintenance/{record_id}")
+def update_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    rec = db.query(MaintenanceRecord).filter(
+        MaintenanceRecord.id == record_id, MaintenanceRecord.property_id == property_id
+    ).first()
+    if not rec:
+        raise HTTPException(404, "Maintenance record not found")
+    for k, v in data.items():
+        if hasattr(MaintenanceRecord, k) and k not in ("id", "property_id"):
+            setattr(rec, k, v)
+    db.commit(); db.refresh(rec)
+    return rec
+
+@router.delete("/properties/{property_id}/maintenance/{record_id}", status_code=204)
+def delete_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    rec = db.query(MaintenanceRecord).filter(
+        MaintenanceRecord.id == record_id, MaintenanceRecord.property_id == property_id
+    ).first()
+    if not rec:
+        raise HTTPException(404, "Maintenance record not found")
+    db.delete(rec); db.commit()

@@ -49,3 +49,7 @@ export function createPolicy(propertyId: string, data: InsuranceCreateData): Pro
 export function updatePolicy(policyId: string, data: Partial<InsuranceCreateData>): Promise<InsuranceData> {
   return api.patch<InsuranceData>(`/insurance/${policyId}`, data);
 }
+
+export function deletePolicy(policyId: string): Promise<void> {
+  return api.delete<void>(`/insurance/${policyId}`);
+}

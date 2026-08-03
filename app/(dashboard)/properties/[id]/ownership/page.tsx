@@ -80,10 +80,8 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
   };
 
   const handleRemoveEntity = async () => {
-    if (confirm("Remove the ownership entity from this property? The entity will still exist for other properties.")) {
-      await removeEntity.mutateAsync();
-      refetch();
-    }
+    await removeEntity.mutateAsync();
+    refetch();
   };
 
   const isIndividual = ownership?.ownership_type === "Individual";

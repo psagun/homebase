@@ -6,6 +6,7 @@ import { useDocuments, useUploadDocument, useDeleteDocument } from "@/lib/hooks/
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { DOCUMENT_CATEGORIES } from "@/lib/constants";
 
 const categoryIcons: Record<string, string> = {
@@ -33,10 +34,6 @@ export function DocumentList({ propertyId }: { propertyId: string }) {
     if (fileInputRef.current) fileInputRef.current.value = "";
   };
 
-  const handleDelete = async (id: string) => {
-    if (confirm("Delete this document?")) await deleteDoc.mutateAsync(id);
-  };
-
   if (isLoading) return <LoadingState text="Loading documents..." />;
   if (isError) return <ErrorState title="Failed to load documents" onRetry={() => refetch()} />;
 
@@ -61,23 +58,25 @@ export function DocumentList({ propertyId }: { propertyId: string }) {
       ) : (
         <div className="rounded-lg border bg-card">
           {docs.map(doc => (
-            <div key={doc.id} className="flex items-center justify-between px-4 py-3 border-b last:border-0 hover:bg-muted/30">
-              <div className="flex items-center gap-3">
+            <div key={doc.id} className="group flex items-center justify-between px-4 py-3 border-b last:border-0 hover:bg-muted/30">
+              <div className="flex items-center gap-3 min-w-0">
                 <span className="text-lg">{categoryIcons[doc.category] || "📄"}</span>
-                <div>
-                  <p className="text-sm font-medium">{doc.name}</p>
+                <div className="min-w-0">
+                  <p className="text-sm font-medium truncate">{doc.name}</p>
                   <p className="text-xs text-muted-foreground">{doc.category} • {doc.file_type}</p>
                 </div>
               </div>
-              <div className="flex items-center gap-2">
-                <a href={`/api/v1/documents/${doc.id}/download`} download
+              <div className="flex items-center gap-2 shrink-0">
+                <a href={`/api/v1/documents/${doc.id}/download`} download title="Download"
                   className="rounded-md border p-2 text-muted-foreground hover:bg-muted">
                   <Download className="h-4 w-4" />
                 </a>
-                <button onClick={() => handleDelete(doc.id)}
-                  className="rounded-md border p-2 text-red-500 hover:bg-red-50">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <ActionsMenu
+                  label={`${doc.name}`}
+                  actions={[
+                    { label: "Delete", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: () => deleteDoc.mutateAsync(doc.id) },
+                  ]}
+                />
               </div>
             </div>
           ))}

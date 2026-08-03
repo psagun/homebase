@@ -101,7 +101,6 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
   };
 
   const handleDelete = async (t: TaxData) => {
-    if (!confirm(`Delete this tax record${t.county ? ` for ${t.county}` : ""}?`)) return;
     try {
       const r = await fetch(`/api/v1/properties/${id}/taxes/${t.id}`, {
         method: "DELETE", credentials: "include",

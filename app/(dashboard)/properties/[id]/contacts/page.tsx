@@ -119,7 +119,6 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
   };
 
   const handleDelete = async (c: ContactData) => {
-    if (!confirm(`Delete ${c.name}? This removes the contact from your directory.`)) return;
     try {
       await deleteContact.mutateAsync(c.id);
       setMsg({ text: "Contact deleted", ok: true });
@@ -130,7 +129,6 @@ export default function PropertyContactsPage({ params }: { params: { id: string 
   };
 
   const handleUnlink = async (c: ContactData) => {
-    if (!confirm(`Unlink ${c.name} from this property? The contact stays in your directory.`)) return;
     try {
       await unlinkContact.mutateAsync({ contactId: c.id, propertyId: id });
       setMsg({ text: "Contact unlinked", ok: true });

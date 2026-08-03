@@ -1,10 +1,11 @@
 "use client";
 
 import { useState } from "react";
-import { Plus, Pencil, ShieldCheck } from "lucide-react";
-import { useInsurance, useCreateInsurance, useUpdateInsurance } from "@/lib/hooks/useInsurance";
+import { Plus, Pencil, ShieldCheck, Trash2 } from "lucide-react";
+import { useInsurance, useCreateInsurance, useUpdateInsurance, useDeleteInsurance } from "@/lib/hooks/useInsurance";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { InsuranceForm } from "@/components/insurance/InsuranceForm";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -17,6 +18,7 @@ export default function InsurancePage({ params }: { params: { id: string } }) {
   const { data: policy, isLoading, isError, refetch } = useInsurance(id);
   const createPolicy = useCreateInsurance(id);
   const updatePolicy = useUpdateInsurance(id);
+  const deletePolicy = useDeleteInsurance(id);
   const [showForm, setShowForm] = useState(false);
   const [editing, setEditing] = useState(false);
 
@@ -28,6 +30,13 @@ export default function InsurancePage({ params }: { params: { id: string } }) {
     else await createPolicy.mutateAsync(data);
     setShowForm(false);
     setEditing(false);
+  };
+
+  const handleDelete = async () => {
+    if (!policy) return;
+    try {
+      await deletePolicy.mutateAsync(policy.id);
+    } catch { /* handled by query client */ }
   };
 
   if (showForm || editing) {
@@ -53,7 +62,13 @@ export default function InsurancePage({ params }: { params: { id: string } }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Insurance Policy</h2>
-        <button onClick={() => setEditing(true)} className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted"><Pencil className="h-4 w-4" />Edit</button>
+        <ActionsMenu
+          label="Insurance policy"
+          actions={[
+            { label: "Edit Policy", icon: <Pencil className="h-4 w-4" />, onClick: () => setEditing(true) },
+            { label: "Delete Policy", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: handleDelete },
+          ]}
+        />
       </div>
 
       <div className="rounded-lg border bg-card p-5">
