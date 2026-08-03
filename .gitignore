@@ -40,3 +40,6 @@ htmlcov/
 .env*
 login_resp.json
 login_response.json
+.migrate_source.txt
+.migrate_target.txt
+.env.prod
