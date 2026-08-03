@@ -15,6 +15,30 @@ from backend.schemas.admin import InvestorCreate, InvestorResponse, InvestorUpda
 router = APIRouter()
 
 
+@router.get("/db-info")
+def db_info(
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Diagnostic: show the database host the app is connected to (password masked)."""
+    _require_admin(current_user)
+    from urllib.parse import urlparse
+    from backend.config import settings
+
+    url = settings.database_url
+    parsed = urlparse(url)
+    # Mask credentials but reveal host/port/dbname so the user can locate the DB
+    return {
+        "dialect": parsed.scheme,
+        "host": parsed.hostname,
+        "port": parsed.port,
+        "database": parsed.path.lstrip("/").split("?")[0],
+        "username": parsed.username,
+        "ssl_required": "sslmode=require" in url or "ssl" in parsed.scheme,
+        "full_masked": url.replace(parsed.password or "", "***") if parsed.password else url,
+    }
+
+
 def _require_admin(current_user: User) -> None:
     """Raise 403 if the current user is not an admin."""
     if current_user.role != "admin":
