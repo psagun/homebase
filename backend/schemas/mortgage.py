@@ -15,6 +15,7 @@ class MortgageCreate(BaseModel):
     original_amount: Optional[Decimal] = None
     current_balance: Optional[Decimal] = None
     monthly_payment: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
     loan_term_months: Optional[int] = None
     start_date: Optional[date] = None
     maturity_date: Optional[date] = None
@@ -31,6 +32,7 @@ class MortgageUpdate(BaseModel):
     original_amount: Optional[Decimal] = None
     current_balance: Optional[Decimal] = None
     monthly_payment: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
     loan_term_months: Optional[int] = None
     start_date: Optional[date] = None
     maturity_date: Optional[date] = None
@@ -49,6 +51,7 @@ class MortgageResponse(BaseModel):
     original_amount: Optional[Decimal] = None
     current_balance: Optional[Decimal] = None
     monthly_payment: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
     loan_term_months: Optional[int] = None
     start_date: Optional[date] = None
     maturity_date: Optional[date] = None

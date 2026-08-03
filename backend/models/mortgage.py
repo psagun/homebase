@@ -25,6 +25,7 @@ class Mortgage(Base):
     original_amount = Column(Numeric(12, 2), nullable=True)
     current_balance = Column(Numeric(12, 2), nullable=True)
     monthly_payment = Column(Numeric(10, 2), nullable=True)
+    payment_frequency = Column(String(20), default="Monthly")
     loan_term_months = Column(Numeric(5), nullable=True)
 
     # Dates

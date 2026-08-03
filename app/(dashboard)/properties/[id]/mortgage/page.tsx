@@ -8,6 +8,7 @@ import { MortgageForm } from "@/components/mortgage/MortgageForm";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
 import { formatCurrency, formatDateFull } from "@/lib/utils";
 import type { MortgageCreateData } from "@/lib/api/mortgage";
 
@@ -119,6 +120,18 @@ export default function MortgagePage({ params }: { params: { id: string } }) {
           <DetailItem label="Next Due Date" value={mortgage.next_due_date ? formatDateFull(mortgage.next_due_date) : "—"} />
           <DetailItem label="Autopay" value={mortgage.autopay_enabled ? "Enabled" : "Disabled"} valueClass={mortgage.autopay_enabled ? "text-emerald-600" : "text-muted-foreground"} />
         </div>
+        {mortgage.portal_url && (
+          <div className="mt-4 pt-4 border-t flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Paid on the lender&apos;s website? Confirm to advance your next due date.
+            </p>
+            <ConfirmPaymentButton
+              paymentType="mortgage"
+              sourceId={mortgage.id}
+              onConfirmed={() => refetch()}
+            />
+          </div>
+        )}
       </div>
     </div>
   );

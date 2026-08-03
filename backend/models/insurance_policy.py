@@ -24,6 +24,7 @@ class InsurancePolicy(Base):
     coverage_amount = Column(Numeric(12, 2), nullable=True)
     deductible = Column(Numeric(10, 2), nullable=True)
     annual_premium = Column(Numeric(10, 2), nullable=True)
+    payment_frequency = Column(String(20), default="Annual")
 
     # Dates
     effective_date = Column(Date, nullable=True)

@@ -9,6 +9,7 @@ import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
 import { formatCurrency } from "@/lib/utils";
 import type { InsuranceCreateData } from "@/lib/api/insurance";
 
@@ -84,6 +85,18 @@ export default function InsurancePage({ params }: { params: { id: string } }) {
           <Item label="Expiration" value={policy.expiration_date ? new Date(policy.expiration_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"} />
           <Item label="Renewal" value={policy.renewal_date ? new Date(policy.renewal_date).toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" }) : "—"} />
         </div>
+        {policy.portal_url && (
+          <div className="mt-4 pt-4 border-t flex items-center justify-between">
+            <p className="text-xs text-muted-foreground">
+              Paid on the provider&apos;s website? Confirm to advance your renewal date.
+            </p>
+            <ConfirmPaymentButton
+              paymentType="insurance"
+              sourceId={policy.id}
+              onConfirmed={() => refetch()}
+            />
+          </div>
+        )}
       </div>
 
       {policy.agent_name && (

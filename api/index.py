@@ -45,3 +45,5 @@ _migrate_add_column(engine, "maintenance_records", "status", "VARCHAR(20) DEFAUL
 _migrate_add_column(engine, "maintenance_records", "scheduled_date", "DATE")
 _migrate_add_column(engine, "maintenance_records", "completed_date", "DATE")
 _migrate_add_column(engine, "maintenance_records", "notes", "TEXT")
+_migrate_add_column(engine, "mortgages", "payment_frequency", "VARCHAR(20) DEFAULT 'Monthly'")
+_migrate_add_column(engine, "insurance_policies", "payment_frequency", "VARCHAR(20) DEFAULT 'Annual'")

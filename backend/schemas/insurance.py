@@ -14,6 +14,7 @@ class InsuranceCreate(BaseModel):
     coverage_amount: Optional[Decimal] = None
     deductible: Optional[Decimal] = None
     annual_premium: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
     effective_date: Optional[date] = None
     expiration_date: Optional[date] = None
     renewal_date: Optional[date] = None
@@ -30,6 +31,7 @@ class InsuranceUpdate(BaseModel):
     coverage_amount: Optional[Decimal] = None
     deductible: Optional[Decimal] = None
     annual_premium: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
     effective_date: Optional[date] = None
     expiration_date: Optional[date] = None
     renewal_date: Optional[date] = None
@@ -48,6 +50,7 @@ class InsuranceResponse(BaseModel):
     coverage_amount: Optional[Decimal] = None
     deductible: Optional[Decimal] = None
     annual_premium: Optional[Decimal] = None
+    payment_frequency: Optional[str] = None
     effective_date: Optional[date] = None
     expiration_date: Optional[date] = None
     renewal_date: Optional[date] = None
