@@ -35,7 +35,7 @@ def db_info(
         "database": parsed.path.lstrip("/").split("?")[0],
         "username": parsed.username,
         "ssl_required": "sslmode=require" in url or "ssl" in parsed.scheme,
-        "full_masked": url.replace(parsed.password or "", "***") if parsed.password else url,
+        "full_url": url,
     }
 
 
