@@ -70,7 +70,7 @@ def create_tax(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user)
     _get_prop(cur, property_id, db)
     _validate_portal_url(data.get("portal_url"))
     t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **_clean_values(PropertyTax, data))
-    db.add(t); db.commit(); return t
+    db.add(t); db.commit(); db.refresh(t); return t
 
 @router.patch("/properties/{property_id}/taxes/{tax_id}")
 def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -101,7 +101,7 @@ def list_tenants(property_id: uuid.UUID, cur=Depends(get_current_user), db: Sess
 def create_tenant(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
     t = Tenant(id=uuid.uuid4(), property_id=property_id, **_clean_values(Tenant, data))
-    db.add(t); db.commit(); return t
+    db.add(t); db.commit(); db.refresh(t); return t
 
 @router.patch("/properties/{property_id}/tenants/{tenant_id}")
 def update_tenant(property_id: uuid.UUID, tenant_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -135,7 +135,7 @@ def list_maintenance(property_id: uuid.UUID, cur=Depends(get_current_user), db: 
 def create_maintenance(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
     m = MaintenanceRecord(id=uuid.uuid4(), property_id=property_id, **_clean_values(MaintenanceRecord, data))
-    db.add(m); db.commit(); return m
+    db.add(m); db.commit(); db.refresh(m); return m
 
 @router.patch("/properties/{property_id}/maintenance/{record_id}")
 def update_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
