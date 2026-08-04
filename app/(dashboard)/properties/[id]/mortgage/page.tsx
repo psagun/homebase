@@ -1,13 +1,14 @@
 "use client";
 
 import { use, useState } from "react";
-import { Plus, Pencil, Landmark } from "lucide-react";
+import { Plus, Pencil, Landmark, Trash2 } from "lucide-react";
 import { useMortgage, useCreateMortgage, useUpdateMortgage, useDeleteMortgage } from "@/lib/hooks/useMortgage";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { MortgageForm } from "@/components/mortgage/MortgageForm";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
 import { PayPortalButton } from "@/components/shared/PayPortalButton";
 import { formatCurrency, formatDateFull } from "@/lib/utils";
@@ -81,13 +82,22 @@ export default function MortgagePage({ params }: { params: { id: string } }) {
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Mortgage Details</h2>
-        <div className="flex gap-2">
-          <button onClick={() => setIsEditing(true)}
-            className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-sm font-medium hover:bg-muted transition-colors">
-            <Pencil className="h-4 w-4" />
-            Edit
-          </button>
-        </div>
+        <ActionsMenu
+          label="Mortgage"
+          actions={[
+            { label: "Edit Mortgage", icon: <Pencil className="h-4 w-4" />, onClick: () => setIsEditing(true) },
+            {
+              label: "Delete Mortgage",
+              icon: <Trash2 className="h-4 w-4" />,
+              destructive: true,
+              onClick: async () => {
+                try {
+                  await deleteMortgage.mutateAsync(mortgage.id);
+                } catch { /* handled by query client */ }
+              },
+            },
+          ]}
+        />
       </div>
 
       {/* Lender Info */}

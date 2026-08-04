@@ -2,25 +2,30 @@
 
 import { useState, useEffect, type FormEvent } from "react";
 import { TRANSACTION_CATEGORIES } from "@/lib/constants";
-import type { TransactionCreateData } from "@/lib/api/transactions";
+import { updateTransaction, type TransactionCreateData, type TransactionData } from "@/lib/api/transactions";
 
 interface Props {
   propertyId: string;
   onSuccess: () => void;
+  /** When provided, the form edits this transaction instead of creating one */
+  initialData?: TransactionData | null;
+  onCancelEdit?: () => void;
 }
 
-export function TransactionForm({ propertyId, onSuccess }: Props) {
-  const [txType, setTxType] = useState<"income" | "expense">("income");
-  const [category, setCategory] = useState("Rent");
-  const [amount, setAmount] = useState("");
-  const [date, setDate] = useState(new Date().toISOString().split("T")[0] || "");
-  const [description, setDescription] = useState("");
+export function TransactionForm({ propertyId, onSuccess, initialData, onCancelEdit }: Props) {
+  const [txType, setTxType] = useState<"income" | "expense">((initialData?.transaction_type as "income" | "expense") || "income");
+  const [category, setCategory] = useState(initialData?.category || "Rent");
+  const [amount, setAmount] = useState(initialData?.amount ? String(initialData.amount) : "");
+  const [date, setDate] = useState(initialData?.transaction_date || new Date().toISOString().split("T")[0] || "");
+  const [description, setDescription] = useState(initialData?.description || "");
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
   const categories = txType === "income" ? TRANSACTION_CATEGORIES.income : TRANSACTION_CATEGORIES.expense;
 
-  useEffect(() => { setCategory(categories[0] || "Rent"); }, [txType]);
+  useEffect(() => {
+    if (!initialData) setCategory(categories[0] || "Rent");
+  }, [txType, initialData]);
 
   const handleSubmit = async (e: FormEvent) => {
     e.preventDefault();
@@ -28,15 +33,25 @@ export function TransactionForm({ propertyId, onSuccess }: Props) {
     if (!amount || Number(amount) <= 0) { setError("Amount must be positive."); return; }
     setLoading(true);
     try {
-      const res = await fetch(`/api/v1/properties/${propertyId}/transactions`, {
-        method: "POST", credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({
-          transaction_type: txType, category, amount: Number(amount),
-          transaction_date: date, description: description.trim() || undefined,
-        } as TransactionCreateData),
-      });
-      if (!res.ok) throw new Error("Failed to save");
+      const payload = {
+        transaction_type: txType, category, amount: Number(amount),
+        transaction_date: date, description: description.trim() || undefined,
+      };
+      if (initialData) {
+        const res = await fetch(`/api/v1/transactions/${initialData.id}`, {
+          method: "PATCH", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload),
+        });
+        if (!res.ok) throw new Error("Failed to update");
+      } else {
+        const res = await fetch(`/api/v1/properties/${propertyId}/transactions`, {
+          method: "POST", credentials: "include",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(payload as TransactionCreateData),
+        });
+        if (!res.ok) throw new Error("Failed to save");
+      }
       setAmount(""); setDescription(""); onSuccess();
     } catch (err: unknown) {
       setError(err && typeof err === "object" && "message" in err ? (err as { message: string }).message : "Failed to save");
@@ -73,9 +88,17 @@ export function TransactionForm({ propertyId, onSuccess }: Props) {
           <input type="text" value={description} onChange={e => setDescription(e.target.value)} className="w-full rounded-md border px-2 py-1.5 text-sm outline-none" placeholder="Optional" />
         </div>
       </div>
-      <button type="submit" disabled={loading} className="w-full rounded-md bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
-        {loading ? "Adding..." : "Add Transaction"}
-      </button>
+      <div className="flex gap-2">
+        <button type="submit" disabled={loading} className="flex-1 rounded-md bg-primary py-2 text-sm font-medium text-white hover:bg-primary/90 disabled:opacity-50">
+          {loading ? (initialData ? "Saving..." : "Adding...") : initialData ? "Save Changes" : "Add Transaction"}
+        </button>
+        {initialData && onCancelEdit && (
+          <button type="button" onClick={onCancelEdit}
+            className="rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted">
+            Cancel
+          </button>
+        )}
+      </div>
     </form>
   );
 }

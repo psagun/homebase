@@ -24,6 +24,22 @@ def _validate_portal_url(value):
     if parsed.scheme not in ("https", "http"):
         raise HTTPException(400, "portal_url must start with http:// or https://")
 
+
+def _clean_values(model, data: dict) -> dict:
+    """Normalize incoming values for a model:
+    - Empty strings → None (DATE/NUMERIC columns reject '' in PostgreSQL)
+    - Only keep fields that exist on the model
+    - Drop id/property_id (never writable)
+    """
+    cleaned = {}
+    for k, v in data.items():
+        if k in ("id", "property_id") or not hasattr(model, k):
+            continue
+        if v == "":
+            v = None
+        cleaned[k] = v
+    return cleaned
+
 def _get_prop(user, property_id, db):
     """Verify user has access to this property. Checks both direct ownership and PropertyInvestor."""
     from backend.models.property_investor import PropertyInvestor
@@ -53,7 +69,7 @@ def list_taxes(property_id: uuid.UUID, cur=Depends(get_current_user), db: Sessio
 def create_tax(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
     _validate_portal_url(data.get("portal_url"))
-    t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(PropertyTax, k)})
+    t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **_clean_values(PropertyTax, data))
     db.add(t); db.commit(); return t
 
 @router.patch("/properties/{property_id}/taxes/{tax_id}")
@@ -63,9 +79,8 @@ def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: dict, cur=Depend
     if not tax:
         raise HTTPException(404, "Tax record not found")
     _validate_portal_url(data.get("portal_url"))
-    for k, v in data.items():
-        if hasattr(PropertyTax, k) and k != "id" and k != "property_id":
-            setattr(tax, k, v)
+    for k, v in _clean_values(PropertyTax, data).items():
+        setattr(tax, k, v)
     db.commit(); db.refresh(tax)
     return tax
 
@@ -85,8 +100,31 @@ def list_tenants(property_id: uuid.UUID, cur=Depends(get_current_user), db: Sess
 @router.post("/properties/{property_id}/tenants")
 def create_tenant(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
-    t = Tenant(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(Tenant, k)})
+    t = Tenant(id=uuid.uuid4(), property_id=property_id, **_clean_values(Tenant, data))
     db.add(t); db.commit(); return t
+
+@router.patch("/properties/{property_id}/tenants/{tenant_id}")
+def update_tenant(property_id: uuid.UUID, tenant_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    tenant = db.query(Tenant).filter(
+        Tenant.id == tenant_id, Tenant.property_id == property_id
+    ).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    for k, v in _clean_values(Tenant, data).items():
+        setattr(tenant, k, v)
+    db.commit(); db.refresh(tenant)
+    return tenant
+
+@router.delete("/properties/{property_id}/tenants/{tenant_id}", status_code=204)
+def delete_tenant(property_id: uuid.UUID, tenant_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    tenant = db.query(Tenant).filter(
+        Tenant.id == tenant_id, Tenant.property_id == property_id
+    ).first()
+    if not tenant:
+        raise HTTPException(404, "Tenant not found")
+    db.delete(tenant); db.commit()
 
 @router.get("/properties/{property_id}/maintenance")
 def list_maintenance(property_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -96,7 +134,7 @@ def list_maintenance(property_id: uuid.UUID, cur=Depends(get_current_user), db: 
 @router.post("/properties/{property_id}/maintenance")
 def create_maintenance(property_id: uuid.UUID, data: dict, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
-    m = MaintenanceRecord(id=uuid.uuid4(), property_id=property_id, **{k: v for k, v in data.items() if hasattr(MaintenanceRecord, k)})
+    m = MaintenanceRecord(id=uuid.uuid4(), property_id=property_id, **_clean_values(MaintenanceRecord, data))
     db.add(m); db.commit(); return m
 
 @router.patch("/properties/{property_id}/maintenance/{record_id}")
@@ -107,9 +145,8 @@ def update_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, data: dict,
     ).first()
     if not rec:
         raise HTTPException(404, "Maintenance record not found")
-    for k, v in data.items():
-        if hasattr(MaintenanceRecord, k) and k not in ("id", "property_id"):
-            setattr(rec, k, v)
+    for k, v in _clean_values(MaintenanceRecord, data).items():
+        setattr(rec, k, v)
     db.commit(); db.refresh(rec)
     return rec
 

@@ -46,3 +46,7 @@ export function createTransaction(propertyId: string, data: TransactionCreateDat
 export function deleteTransaction(txnId: string): Promise<void> {
   return api.delete(`/transactions/${txnId}`);
 }
+
+export function updateTransaction(txnId: string, data: Partial<TransactionCreateData>): Promise<TransactionData> {
+  return api.patch(`/transactions/${txnId}`, data);
+}

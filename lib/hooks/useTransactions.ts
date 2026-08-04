@@ -25,3 +25,15 @@ export function useDeleteTransaction(propertyId: string) {
     onSuccess: () => qc.invalidateQueries({ queryKey: ["transactions", propertyId] }),
   });
 }
+
+export function useUpdateTransaction(propertyId: string) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, data }: { id: string; data: Partial<import("@/lib/api/transactions").TransactionCreateData> }) =>
+      import("@/lib/api/transactions").then((m) => m.updateTransaction(id, data)),
+    onSuccess: () => {
+      qc.invalidateQueries({ queryKey: ["transactions", propertyId] });
+      qc.invalidateQueries({ queryKey: ["cash-flow", propertyId] });
+    },
+  });
+}

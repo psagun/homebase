@@ -1,18 +1,21 @@
 "use client";
 
 import { useState } from "react";
-import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2 } from "lucide-react";
+import { DollarSign, TrendingUp, TrendingDown, Plus, Trash2, Pencil } from "lucide-react";
 import { useTransactions, useCashFlow, useCreateTransaction, useDeleteTransaction } from "@/lib/hooks/useTransactions";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { TransactionForm } from "@/components/transactions/TransactionForm";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { formatCurrency, formatShortDate } from "@/lib/utils";
+import type { TransactionData } from "@/lib/api/transactions";
 
 export default function FinancialsPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const [showForm, setShowForm] = useState(false);
+  const [editingTxn, setEditingTxn] = useState<TransactionData | null>(null);
   const { data: property } = useProperty(id);
   const { data: txns, isLoading, isError, refetch } = useTransactions(id);
   const { data: cashFlow } = useCashFlow(id);
@@ -21,17 +24,29 @@ export default function FinancialsPage({ params }: { params: { id: string } }) {
   if (isLoading) return <LoadingState text="Loading financials..." />;
   if (isError) return <ErrorState title="Failed to load" onRetry={() => refetch()} />;
 
+  const startEdit = (t: TransactionData) => {
+    setEditingTxn(t);
+    setShowForm(true);
+  };
+
   return (
     <div className="space-y-6">
       <div className="flex items-center justify-between">
         <h2 className="text-lg font-semibold">Financials{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}</h2>
-        <button onClick={() => setShowForm(!showForm)}
+        <button onClick={() => { setShowForm(!showForm); setEditingTxn(null); }}
           className="flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90">
           <Plus className="h-4 w-4" />{showForm ? "Cancel" : "Add Transaction"}
         </button>
       </div>
 
-      {showForm && <TransactionForm propertyId={id} onSuccess={() => { setShowForm(false); refetch(); }} />}
+      {(showForm || editingTxn) && (
+        <TransactionForm
+          propertyId={id}
+          initialData={editingTxn}
+          onCancelEdit={() => { setEditingTxn(null); setShowForm(false); }}
+          onSuccess={() => { setShowForm(false); setEditingTxn(null); refetch(); }}
+        />
+      )}
 
       {/* Cash Flow Summary */}
       {cashFlow && (
@@ -111,9 +126,13 @@ export default function FinancialsPage({ params }: { params: { id: string } }) {
                 <span className={`text-sm font-mono font-semibold ${t.transaction_type === "income" ? "text-emerald-600" : "text-red-600"}`}>
                   {t.transaction_type === "income" ? "+" : "-"}{formatCurrency(t.amount)}
                 </span>
-                <button onClick={() => deleteTxn.mutateAsync(t.id)} className="rounded-md p-1 text-muted-foreground hover:text-red-500">
-                  <Trash2 className="h-4 w-4" />
-                </button>
+                <ActionsMenu
+                  label={`${t.category} transaction`}
+                  actions={[
+                    { label: "Edit Transaction", icon: <Pencil className="h-4 w-4" />, onClick: () => startEdit(t) },
+                    { label: "Delete", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: () => deleteTxn.mutateAsync(t.id) },
+                  ]}
+                />
               </div>
             </div>
           ))}
