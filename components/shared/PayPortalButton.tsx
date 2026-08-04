@@ -20,9 +20,13 @@ interface PayPortalButtonProps {
 export function PayPortalButton({ paymentType, sourceId, url, dueDate, label }: PayPortalButtonProps) {
   const { markPending } = usePendingPayment(paymentType, sourceId);
 
+  // Only allow http(s) URLs — protects all consumers from open redirects
+  const safeUrl = /^https?:\/\//i.test(url) ? url : undefined;
+  if (!safeUrl) return null;
+
   return (
     <a
-      href={url}
+      href={safeUrl}
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => markPending(dueDate || undefined)}
