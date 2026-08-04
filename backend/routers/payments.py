@@ -130,8 +130,9 @@ def confirm_payment(
             {"nd": next_due, "id": source_id},
         )
 
-    # Sync the related task: advance due date, reset status to Upcoming
-    task_type = {"mortgage": "Mortgage Payment", "insurance": "Insurance Renewal", "tax": "Property Tax"}[payment_type]
+    # Sync the related task: advance due date, reset status to Upcoming.
+    # task_type is a PostgreSQL enum — use the enum member names.
+    task_type_enum = {"mortgage": "MORTGAGE_PAYMENT", "insurance": "INSURANCE_RENEWAL", "tax": "PROPERTY_TAX"}[payment_type]
     db.execute(
         text(
             """
@@ -141,7 +142,7 @@ def confirm_payment(
               AND status IN ('Overdue', 'Due Today', 'Upcoming')
             """
         ),
-        {"nd": next_due, "pid": row.property_id, "tt": task_type},
+        {"nd": next_due, "pid": row.property_id, "tt": task_type_enum},
     )
 
     # Record payment history
