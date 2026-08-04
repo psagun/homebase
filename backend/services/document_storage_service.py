@@ -1,42 +1,110 @@
-"""Abstract file storage service. Uses local filesystem for dev, ready for S3."""
+"""Document storage — Supabase Storage (private bucket) with signed URLs.
+
+Falls back to the local filesystem when SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY
+are not configured (local development).
+"""
 
 import os
-import shutil
 import uuid
 from pathlib import Path
 
+from fastapi import HTTPException
 from fastapi import UploadFile
+
 from backend.config import settings
 
 STORAGE_DIR = Path(settings.storage_local_path).resolve()
 
-
-def _ensure_dir():
-    STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-
-
-def _file_path(storage_key: str) -> Path:
-    return STORAGE_DIR / storage_key
+# Bucket name for all document uploads (created lazily)
+BUCKET = "documents"
 
 
-async def upload_file(file: UploadFile) -> str:
-    """Save uploaded file, return storage_key."""
-    _ensure_dir()
-    ext = os.path.splitext(file.filename or "file")[1] or ""
-    storage_key = f"{uuid.uuid4()}{ext}"
-    dest = _file_path(storage_key)
+def _supabase_client():
+    from supabase import create_client
+
+    url = os.getenv("SUPABASE_URL", "")
+    key = os.getenv("SUPABASE_SERVICE_ROLE_KEY", "")
+    if not url or not key:
+        return None
+    return create_client(url, key)
+
+
+def _ensure_bucket(client) -> None:
+    """Create the private documents bucket if it doesn't exist."""
+    try:
+        client.storage.get_bucket(BUCKET)
+    except Exception:
+        try:
+            client.storage.create_bucket(BUCKET, options={"public": False})
+        except Exception:
+            pass  # concurrent creation is fine
+
+
+def is_supabase_configured() -> bool:
+    return bool(os.getenv("SUPABASE_URL") and os.getenv("SUPABASE_SERVICE_ROLE_KEY"))
+
+
+async def upload_file(file: UploadFile, folder: str = "") -> str:
+    """Upload a file, returning its storage key."""
     content = await file.read()
+    return upload_bytes(content, file.filename, file.content_type, folder=folder)
+
+
+def upload_bytes(content: bytes, filename: str, content_type: str | None = None, folder: str = "") -> str:
+    """Upload raw bytes, returning its storage key.
+
+    folder is a path prefix like "properties/{propertyId}".
+    Returns the full storage key (e.g. "properties/abc/file.pdf").
+    """
+    client = _supabase_client()
+    ext = os.path.splitext(filename or "file")[1] or ""
+    file_key = f"{uuid.uuid4()}{ext}"
+    key = f"{folder}/{file_key}" if folder else file_key
+
+    if client:
+        _ensure_bucket(client)
+        try:
+            client.storage.from_(BUCKET).upload(
+                key, content,
+                {"content-type": content_type or "application/octet-stream"},
+            )
+            return key
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+
+    # Local fallback
+    dest = STORAGE_DIR / key
+    dest.parent.mkdir(parents=True, exist_ok=True)
     dest.write_bytes(content)
-    return storage_key
+    return key
 
 
 def delete_file(storage_key: str) -> None:
-    """Remove a stored file."""
-    path = _file_path(storage_key)
+    """Delete a file by its storage key."""
+    client = _supabase_client()
+    if client:
+        try:
+            client.storage.from_(BUCKET).remove([storage_key])
+            return
+        except Exception:
+            pass  # file may not exist
+    # Local fallback
+    path = STORAGE_DIR / storage_key
     if path.exists():
         path.unlink()
 
 
 def get_file_path(storage_key: str) -> Path:
-    """Return path for file download."""
-    return _file_path(storage_key)
+    """Local-only: resolve a storage key to a local path."""
+    return STORAGE_DIR / storage_key
+
+
+def create_signed_url(storage_key: str, expires_in: int = 3600) -> str:
+    """Generate a short-lived signed URL for preview/download."""
+    client = _supabase_client()
+    if client:
+        try:
+            return client.storage.from_(BUCKET).create_signed_url(storage_key, expires_in)["signedURL"]
+        except Exception:
+            return ""
+    return ""

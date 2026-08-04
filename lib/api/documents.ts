@@ -42,3 +42,30 @@ export async function uploadDocument(
 export function deleteDocument(docId: string): Promise<void> {
   return api.delete<void>(`/documents/${docId}`);
 }
+
+export function renameDocument(docId: string, name: string): Promise<DocumentData> {
+  return api.patch<DocumentData>(`/documents/${docId}?name=${encodeURIComponent(name)}`);
+}
+
+export async function replaceDocument(
+  docId: string,
+  file: File
+): Promise<DocumentData> {
+  const formData = new FormData();
+  formData.append("file", file);
+  const res = await fetch(`/api/v1/documents/${docId}`, {
+    method: "PUT",
+    credentials: "include",
+    body: formData,
+  });
+  if (!res.ok) throw new Error("Replace failed");
+  return res.json();
+}
+
+export async function previewDocument(
+  docId: string
+): Promise<{ url: string; name: string; file_type: string }> {
+  return api.get<{ url: string; name: string; file_type: string }>(
+    `/documents/${docId}/preview`
+  );
+}

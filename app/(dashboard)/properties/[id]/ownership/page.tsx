@@ -18,6 +18,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ActionsMenu } from "@/components/shared/ActionsMenu";
+import { DocumentManager } from "@/components/documents/DocumentManager";
 import type { EntityData } from "@/lib/api/ownership";
 
 export default function OwnershipPage({ params }: { params: { id: string } }) {
@@ -305,7 +306,17 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
 
       {/* Documents */}
       {!isIndividual && ownership?.entity && (
-        <DocumentsSection propertyId={id} />
+        <div className="rounded-lg border bg-card p-5">
+          <div className="flex items-center gap-2 mb-4">
+            <FileText className="h-5 w-5 text-muted-foreground" />
+            <h3 className="text-sm font-semibold">Entity Documents</h3>
+          </div>
+          <DocumentManager
+            propertyId={id}
+            categories={["Certificate of Formation", "Operating Agreement", "EIN Letter", "Tax Document"]}
+            uploadLabel="Upload Entity Document"
+          />
+        </div>
       )}
 
       {isIndividual && (
@@ -527,81 +538,6 @@ function InvestorsSection({
           Warning: Ownership totals {totalPct.toFixed(1)}%. They should total 100%.
         </div>
       )}
-    </div>
-  );
-}
-
-/* ─── Documents Section ─── */
-
-function DocumentsSection({ propertyId }: { propertyId: string }) {
-  const [docs, setDocs] = useState<any[]>([]);
-
-  useEffect(() => {
-    fetch(`/api/v1/properties/${propertyId}/documents`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data) => setDocs(data.filter((d: any) => ["Certificate of Formation", "Operating Agreement", "EIN Letter", "Tax Document"].includes(d.category))))
-      .catch(() => {});
-  }, [propertyId]);
-
-  const ownershipDocCategories = [
-    { label: "Certificate of Formation", key: "Certificate of Formation" },
-    { label: "Operating Agreement", key: "Operating Agreement" },
-    { label: "EIN Letter", key: "EIN Letter" },
-    { label: "Tax Documents", key: "Tax Document" },
-  ];
-
-  const handleUpload = async (category: string) => {
-    const input = document.createElement("input");
-    input.type = "file";
-    input.onchange = async () => {
-      const file = input.files?.[0];
-      if (!file) return;
-      const formData = new FormData();
-      formData.append("file", file);
-      try {
-        await fetch(`/api/v1/properties/${propertyId}/documents?category=${encodeURIComponent(category)}`, {
-          method: "POST", credentials: "include", body: formData,
-        });
-        // Refresh
-        const resp = await fetch(`/api/v1/properties/${propertyId}/documents`, { credentials: "include" });
-        const data = await resp.json();
-        setDocs(data.filter((d: any) => ["Certificate of Formation", "Operating Agreement", "EIN Letter", "Tax Document"].includes(d.category)));
-      } catch {}
-    };
-    input.click();
-  };
-
-  return (
-    <div className="rounded-lg border bg-card">
-      <div className="flex items-center justify-between px-5 py-4 border-b">
-        <div className="flex items-center gap-2">
-          <FileText className="h-5 w-5 text-muted-foreground" />
-          <h3 className="text-sm font-semibold">Entity Documents</h3>
-        </div>
-      </div>
-      <div className="divide-y">
-        {ownershipDocCategories.map((cat) => {
-          const doc = docs.find((d) => d.category === cat.key);
-          return (
-            <div key={cat.key} className="flex items-center justify-between px-5 py-3">
-              <div>
-                <p className="text-sm font-medium">{cat.label}</p>
-                {doc ? (
-                  <a href={doc.storage_key} target="_blank" rel="noopener noreferrer"
-                    className="text-xs text-primary hover:underline">{doc.name || "View document"}</a>
-                ) : (
-                  <p className="text-xs text-muted-foreground">Not uploaded</p>
-                )}
-              </div>
-              <button onClick={() => handleUpload(cat.key)}
-                className="flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-xs font-medium hover:bg-muted transition-colors">
-                <Plus className="h-3.5 w-3.5" />
-                {doc ? "Replace" : "Upload"}
-              </button>
-            </div>
-          );
-        })}
-      </div>
     </div>
   );
 }
