@@ -89,7 +89,9 @@ def upload_bytes(content: bytes, filename: str, content_type: str | None = None,
             )
             return key
         except Exception as e:
-            raise HTTPException(status_code=500, detail=f"Upload failed: {str(e)}")
+            import logging
+            logging.getLogger(__name__).error("Upload to Supabase failed: %s", e, exc_info=True)
+            raise HTTPException(status_code=500, detail="Upload failed — please try again later.")
 
     # Local fallback
     dest = STORAGE_DIR / key
