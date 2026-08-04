@@ -62,14 +62,20 @@ def list_tasks(
         term = f"%{search}%"
         query = query.filter(Task.title.ilike(term))
 
-    # Refresh status before returning
+    # Refresh status before returning — only write back when a status actually
+    # changed, so plain reads don't generate UPDATEs against the DB.
     tasks = query.options(joinedload(Task.property)).order_by(
         Task.due_date.asc().nullslast(), Task.created_at.desc()
     ).all()
+    changed = False
     for t in tasks:
+        before = t.status
         _refresh_status(t)
+        if t.status != before:
+            changed = True
         t.property_name = t.property.name if t.property else None
-    db.commit()
+    if changed:
+        db.commit()
     return tasks
 
 
