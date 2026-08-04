@@ -137,9 +137,9 @@ def confirm_payment(
         text(
             """
             UPDATE tasks
-            SET due_date = :nd, status = 'Upcoming'
+            SET due_date = :nd, status = 'UPCOMING'
             WHERE property_id = :pid AND task_type = :tt
-              AND status IN ('Overdue', 'Due Today', 'Upcoming')
+              AND status IN ('OVERDUE', 'DUE_TODAY', 'UPCOMING')
             """
         ),
         {"nd": next_due, "pid": row.property_id, "tt": task_type_enum},
