@@ -32,11 +32,16 @@ def _get_visible_property_ids(db: Session, user: User) -> list:
         return [r[0] for r in rows]
 
 
-def _prop_name(db: Session, pid) -> str:
-    if not pid:
-        return ""
-    row = db.execute(text("SELECT name FROM properties WHERE id = :pid"), {"pid": pid}).first()
-    return f" — {row[0]}" if row else ""
+def _load_property_names(db: Session, ids: list) -> dict:
+    """Batch-load property names in ONE query (avoids N+1 lookups)."""
+    unique = {pid for pid in ids if pid}
+    if not unique:
+        return {}
+    rows = db.execute(
+        text(f"SELECT id, name FROM properties WHERE id IN ({','.join([':p%d' % i for i in range(len(unique))])})"),
+        {f"p{i}": pid for i, pid in enumerate(unique)},
+    ).fetchall()
+    return {str(r[0]): str(r[1]) for r in rows}
 
 
 @router.post("/read")
@@ -82,48 +87,60 @@ def get_notifications(
             ~Task.status.in_(excluded),
         ).all()
 
+    overdue_tasks = _tasks_by_status([TaskStatus.OVERDUE])
+    due_today_tasks = _tasks_by_status([TaskStatus.DUE_TODAY])
+    upcoming_tasks = _upcoming_tasks()
+    mortgages = db.query(Mortgage).filter(
+        Mortgage.property_id.in_(prop_ids),
+        Mortgage.is_active == True,
+        Mortgage.next_due_date.isnot(None),
+    ).all()
+
+    # Batch-load all property names in a single query
+    all_prop_ids = (
+        [t.property_id for t in overdue_tasks + due_today_tasks + upcoming_tasks]
+        + [m.property_id for m in mortgages]
+    )
+    prop_names = _load_property_names(db, all_prop_ids)
+    name_of = lambda pid: f" — {prop_names.get(str(pid), '')}" if pid and prop_names.get(str(pid)) else ""
+
     # Overdue tasks
-    for t in _tasks_by_status([TaskStatus.OVERDUE]):
+    for t in overdue_tasks:
         notifications.append({
             "id": f"task-overdue-{t.id}",
-            "title": f"Overdue: {t.title}{_prop_name(db, t.property_id)}",
+            "title": f"Overdue: {t.title}{name_of(t.property_id)}",
             "type": "task_overdue", "severity": "error",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
             "read": False, "date": str(t.due_date or ""),
         })
 
     # Due today
-    for t in _tasks_by_status([TaskStatus.DUE_TODAY]):
+    for t in due_today_tasks:
         notifications.append({
             "id": f"task-today-{t.id}",
-            "title": f"Due today: {t.title}{_prop_name(db, t.property_id)}",
+            "title": f"Due today: {t.title}{name_of(t.property_id)}",
             "type": "task_due_today", "severity": "warning",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
             "read": False, "date": str(t.due_date or ""),
         })
 
     # Upcoming (next 7 days)
-    for t in _upcoming_tasks():
+    for t in upcoming_tasks:
         notifications.append({
             "id": f"task-upcoming-{t.id}",
-            "title": f"Upcoming: {t.title}{_prop_name(db, t.property_id)}",
+            "title": f"Upcoming: {t.title}{name_of(t.property_id)}",
             "type": "task_upcoming", "severity": "info",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
             "read": False, "date": str(t.due_date or ""),
         })
 
     # Mortgage payments due within 30 days
-    mortgages = db.query(Mortgage).filter(
-        Mortgage.property_id.in_(prop_ids),
-        Mortgage.is_active == True,
-        Mortgage.next_due_date.isnot(None),
-    ).all()
     for m in mortgages:
         days = (m.next_due_date - today).days
         if 0 <= days <= 30:
             notifications.append({
                 "id": f"mortgage-{m.id}",
-                "title": f"Mortgage payment due in {days}d{_prop_name(db, m.property_id)}",
+                "title": f"Mortgage payment due in {days}d{name_of(m.property_id)}",
                 "type": "mortgage_due", "severity": "info",
                 "link": f"/properties/{m.property_id}/mortgage",
                 "read": False, "date": str(m.next_due_date),
@@ -140,7 +157,7 @@ def get_notifications(
         if 0 <= days <= 60:
             notifications.append({
                 "id": f"insurance-{p.id}",
-                "title": f"Insurance renews in {days}d{_prop_name(db, p.property_id)}",
+                "title": f"Insurance renews in {days}d{name_of(p.property_id)}",
                 "type": "insurance_renewal",
                 "severity": "warning" if days <= 14 else "info",
                 "link": f"/properties/{p.property_id}/insurance",
