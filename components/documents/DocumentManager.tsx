@@ -253,7 +253,7 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
             </div>
             <div className="h-[70vh] w-full bg-muted/30">
               {preview.file_type === ".pdf" ? (
-                <iframe src={preview.url} className="h-full w-full" title={preview.name} />
+                <iframe src={preview.url} sandbox="allow-scripts allow-same-origin" className="h-full w-full" title={preview.name} />
               ) : (
                 <div className="flex h-full flex-col items-center justify-center gap-3">
                   <FileText className="h-16 w-16 text-muted-foreground" />

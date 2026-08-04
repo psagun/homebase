@@ -1,0 +1,181 @@
+- generic [active] [ref=f1e1]:
+  - alert [ref=f1e2]
+  - generic [ref=f1e3]:
+    - complementary [ref=f1e5]:
+      - generic [ref=f1e7]:
+        - generic [ref=f1e8]: H
+        - generic [ref=f1e9]: HomeBase
+      - navigation [ref=f1e10]:
+        - generic [ref=f1e11]:
+          - paragraph [ref=f1e12]: Main
+          - link "Dashboard" [ref=f1e13] [cursor=pointer]:
+            - /url: /dashboard
+          - link "Properties 12" [ref=f1e20] [cursor=pointer]:
+            - /url: /properties
+            - generic [ref=f1e25]: Properties
+            - generic [ref=f1e26]: "12"
+          - link "Tasks & Reminders" [ref=f1e27] [cursor=pointer]:
+            - /url: /tasks
+        - generic [ref=f1e32]:
+          - paragraph [ref=f1e33]: Planning
+          - link "Calendar" [ref=f1e34] [cursor=pointer]:
+            - /url: /calendar
+          - link "Documents" [ref=f1e38] [cursor=pointer]:
+            - /url: /documents
+          - link "Transactions" [ref=f1e43] [cursor=pointer]:
+            - /url: /transactions
+          - link "Reports" [ref=f1e48] [cursor=pointer]:
+            - /url: /reports
+        - generic [ref=f1e52]:
+          - paragraph [ref=f1e53]: Directory
+          - link "Contacts" [ref=f1e54] [cursor=pointer]:
+            - /url: /contacts
+      - generic [ref=f1e61]:
+        - link "D Demo User demo@homebase.app" [ref=f1e62] [cursor=pointer]:
+          - /url: /settings
+          - generic [ref=f1e63]: D
+          - generic [ref=f1e64]:
+            - paragraph [ref=f1e65]: Demo User
+            - paragraph [ref=f1e66]: demo@homebase.app
+        - button "Sign Out" [ref=f1e67] [cursor=pointer]
+    - generic [ref=f1e72]:
+      - banner [ref=f1e73]:
+        - heading "Dashboard" [level=1] [ref=f1e76]
+        - generic [ref=f1e77]:
+          - button "7" [ref=f1e79] [cursor=pointer]
+          - link "Add Property" [ref=f1e84] [cursor=pointer]:
+            - /url: /properties/new
+      - main [ref=f1e86]:
+        - generic [ref=f1e87]:
+          - generic [ref=f1e88]:
+            - heading "Welcome back, Demo 👋" [level=1] [ref=f1e89]
+            - paragraph [ref=f1e90]: Here's what's happening with your properties.
+          - generic [ref=f1e91]:
+            - generic [ref=f1e97]:
+              - paragraph [ref=f1e98]: Total Properties
+              - paragraph [ref=f1e99]: "12"
+              - paragraph [ref=f1e100]: 50% occupied
+            - generic [ref=f1e105]:
+              - paragraph [ref=f1e106]: Total Value
+              - paragraph [ref=f1e107]: $7,780,000
+              - paragraph [ref=f1e108]: +11.22%
+            - generic [ref=f1e114]:
+              - paragraph [ref=f1e115]: Total Equity
+              - paragraph [ref=f1e116]: $785,000
+              - paragraph [ref=f1e117]: +$785,000
+            - generic [ref=f1e123]:
+              - paragraph [ref=f1e124]: Monthly Rent
+              - paragraph [ref=f1e125]: —
+              - paragraph [ref=f1e126]: No data yet
+            - generic [ref=f1e132]:
+              - paragraph [ref=f1e133]: Cash Flow (MTD)
+              - paragraph [ref=f1e134]: —
+              - paragraph [ref=f1e135]: Add transactions
+          - generic [ref=f1e136]:
+            - generic [ref=f1e137]:
+              - generic [ref=f1e138]:
+                - heading "Upcoming Reminders" [level=2] [ref=f1e139]
+                - link "View all" [ref=f1e140] [cursor=pointer]:
+                  - /url: /tasks
+              - generic [ref=f1e141]:
+                - link "HOA dues - Oakwood Townhomes HOA Payment Oakwood Townhomes Overdue by 11d" [ref=f1e142] [cursor=pointer]:
+                  - /url: /properties/395f9d63-a38e-49f2-86c5-822b537e2d25
+                  - generic [ref=f1e148]:
+                    - paragraph [ref=f1e149]: HOA dues - Oakwood Townhomes
+                    - paragraph [ref=f1e150]: HOA Payment
+                    - paragraph [ref=f1e151]: Oakwood Townhomes
+                  - generic [ref=f1e152]: Overdue by 11d
+                - link "Collect rent - Harbor Loft Rent Collection Harbor Loft Due in 1d" [ref=f1e155] [cursor=pointer]:
+                  - /url: /properties/2f8415f6-781b-469a-9e9c-2874d8b34ea4
+                  - generic [ref=f1e159]:
+                    - paragraph [ref=f1e160]: Collect rent - Harbor Loft
+                    - paragraph [ref=f1e161]: Rent Collection
+                    - paragraph [ref=f1e162]: Harbor Loft
+                  - generic [ref=f1e163]: Due in 1d
+                - link "Follow up with realtor - Desert Oasis Custom Desert Oasis Due in 2d" [ref=f1e166] [cursor=pointer]:
+                  - /url: /properties/60401d35-8567-4aa4-b861-9fce089b6513
+                  - generic [ref=f1e171]:
+                    - paragraph [ref=f1e172]: Follow up with realtor - Desert Oasis
+                    - paragraph [ref=f1e173]: Custom
+                    - paragraph [ref=f1e174]: Desert Oasis
+                  - generic [ref=f1e175]: Due in 2d
+                - link "Mortgage payment - Sunset Villa Mortgage Payment Sunset Villa Due in 2d" [ref=f1e178] [cursor=pointer]:
+                  - /url: /properties/bb3a951d-5895-4de4-9f04-18bf4e522a4a
+                  - generic [ref=f1e182]:
+                    - paragraph [ref=f1e183]: Mortgage payment - Sunset Villa
+                    - paragraph [ref=f1e184]: Mortgage Payment
+                    - paragraph [ref=f1e185]: Sunset Villa
+                  - generic [ref=f1e186]: Due in 2d
+                - link "Collect rent - Sunset Villa Rent Collection Sunset Villa Due in 4d" [ref=f1e189] [cursor=pointer]:
+                  - /url: /properties/bb3a951d-5895-4de4-9f04-18bf4e522a4a
+                  - generic [ref=f1e193]:
+                    - paragraph [ref=f1e194]: Collect rent - Sunset Villa
+                    - paragraph [ref=f1e195]: Rent Collection
+                    - paragraph [ref=f1e196]: Sunset Villa
+                  - generic [ref=f1e197]: Due in 4d
+            - generic [ref=f1e200]:
+              - generic [ref=f1e201]:
+                - heading "Cash Flow This Month" [level=2] [ref=f1e202]
+                - link "View report" [ref=f1e203] [cursor=pointer]:
+                  - /url: /transactions
+              - paragraph [ref=f1e205]: Add transactions to see cash flow
+            - generic [ref=f1e206]:
+              - heading "Properties by Status" [level=2] [ref=f1e208]
+              - generic [ref=f1e217]:
+                - generic [ref=f1e218]:
+                  - generic [ref=f1e220]: For Sale
+                  - generic [ref=f1e221]: "1"
+                  - generic [ref=f1e222]: (8%)
+                - generic [ref=f1e223]:
+                  - generic [ref=f1e225]: Occupied
+                  - generic [ref=f1e226]: "6"
+                  - generic [ref=f1e227]: (50%)
+                - generic [ref=f1e228]:
+                  - generic [ref=f1e230]: Under Maintenance
+                  - generic [ref=f1e231]: "1"
+                  - generic [ref=f1e232]: (8%)
+                - generic [ref=f1e233]:
+                  - generic [ref=f1e235]: Vacant
+                  - generic [ref=f1e236]: "4"
+                  - generic [ref=f1e237]: (33%)
+          - generic [ref=f1e238]:
+            - generic [ref=f1e239]:
+              - heading "Recently Viewed" [level=2] [ref=f1e240]
+              - link "View all" [ref=f1e241] [cursor=pointer]:
+                - /url: /properties
+            - generic [ref=f1e242]:
+              - link "$0 HELLO SDS, SDS Vacant" [ref=f1e243] [cursor=pointer]:
+                - /url: /properties/c9d89489-9ed0-4c38-a0cd-0af995295b92
+                - generic [ref=f1e244]: $0
+                - generic [ref=f1e256]:
+                  - paragraph [ref=f1e257]: HELLO
+                  - paragraph [ref=f1e258]: SDS, SDS
+                  - generic [ref=f1e259]: Vacant
+              - link "$525,000 Sunset Villa Miami, FL Occupied" [ref=f1e260] [cursor=pointer]:
+                - /url: /properties/bb3a951d-5895-4de4-9f04-18bf4e522a4a
+                - generic [ref=f1e261]: $525,000
+                - generic [ref=f1e273]:
+                  - paragraph [ref=f1e274]: Sunset Villa
+                  - paragraph [ref=f1e275]: Miami, FL
+                  - generic [ref=f1e276]: Occupied
+              - link "$150,000 Test Mansion Dallas, TX Vacant" [ref=f1e277] [cursor=pointer]:
+                - /url: /properties/4edd45bd-e029-4e1e-8c67-c78ff3b9bc17
+                - generic [ref=f1e278]: $150,000
+                - generic [ref=f1e290]:
+                  - paragraph [ref=f1e291]: Test Mansion
+                  - paragraph [ref=f1e292]: Dallas, TX
+                  - generic [ref=f1e293]: Vacant
+              - link "$320,000 Desert Oasis Phoenix, AZ For Sale" [ref=f1e294] [cursor=pointer]:
+                - /url: /properties/60401d35-8567-4aa4-b861-9fce089b6513
+                - generic [ref=f1e295]: $320,000
+                - generic [ref=f1e307]:
+                  - paragraph [ref=f1e308]: Desert Oasis
+                  - paragraph [ref=f1e309]: Phoenix, AZ
+                  - generic [ref=f1e310]: For Sale
+              - link "$1,450,000 Oakwood Townhomes Atlanta, GA Occupied" [ref=f1e311] [cursor=pointer]:
+                - /url: /properties/395f9d63-a38e-49f2-86c5-822b537e2d25
+                - generic [ref=f1e312]: $1,450,000
+                - generic [ref=f1e322]:
+                  - paragraph [ref=f1e323]: Oakwood Townhomes
+                  - paragraph [ref=f1e324]: Atlanta, GA
+                  - generic [ref=f1e325]: Occupied

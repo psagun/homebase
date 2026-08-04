@@ -18,6 +18,16 @@ STORAGE_DIR = Path(settings.storage_local_path).resolve()
 # Bucket name for all document uploads (created lazily)
 BUCKET = "documents"
 
+# Extension → expected MIME type allowlist (prevents stored-XSS via content-type tricks)
+ALLOWED_CONTENT_TYPES = {
+    ".pdf": "application/pdf",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".png": "image/png",
+}
+
 
 def _supabase_client():
     from supabase import create_client
@@ -58,6 +68,15 @@ def upload_bytes(content: bytes, filename: str, content_type: str | None = None,
     """
     client = _supabase_client()
     ext = os.path.splitext(filename or "file")[1] or ""
+    # Validate content-type against the extension allowlist (server-side)
+    expected_type = ALLOWED_CONTENT_TYPES.get(ext.lower())
+    if not expected_type:
+        raise HTTPException(status_code=400, detail=f"File type {ext} not supported")
+    if content_type and content_type.split(";")[0].strip() != expected_type:
+        # Some clients send generic types (e.g. application/octet-stream) — trust the extension
+        if content_type.split(";")[0].strip() not in ("application/octet-stream", ""):
+            raise HTTPException(status_code=400, detail=f"Content-Type mismatch for {ext}")
+
     file_key = f"{uuid.uuid4()}{ext}"
     key = f"{folder}/{file_key}" if folder else file_key
 
