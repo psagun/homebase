@@ -170,6 +170,35 @@ def confirm_payment(
     }
 
 
+def _load_source_amounts(db: Session, records: list) -> dict:
+    """Batch-load the payment amount per source record (one query per type — no N+1).
+
+    Returns {str(source_id): amount_or_None} using the payment-type's amount column.
+    """
+    amounts: dict = {}
+    by_type: dict = {}
+    for r in records:
+        by_type.setdefault(r.payment_type, []).append(r.source_id)
+
+    amount_cols = {
+        "mortgage": ("mortgages", "monthly_payment"),
+        "insurance": ("insurance_policies", "annual_premium"),
+        "tax": ("property_taxes", "annual_tax"),
+    }
+    for ptype, ids in by_type.items():
+        table, col = amount_cols.get(ptype, (None, None))
+        if not table:
+            continue
+        placeholders = ",".join([f":p{i}" for i in range(len(ids))])
+        rows = db.execute(
+            text(f"SELECT id, {col} FROM {table} WHERE id IN ({placeholders})"),
+            {f"p{i}": sid for i, sid in enumerate(ids)},
+        ).fetchall()
+        for rid, amt in rows:
+            amounts[str(rid)] = float(amt) if amt is not None else None
+    return amounts
+
+
 @router.get("/history")
 def payment_history(
     property_id: uuid.UUID = Query(None, description="Filter to a property"),
@@ -185,12 +214,17 @@ def payment_history(
         query = query.filter(PaymentHistory.payment_type == payment_type)
 
     records = query.order_by(PaymentHistory.confirmed_at.desc()).limit(50).all()
+
+    prop_names = _load_property_names(db, [r.property_id for r in records])
+    amounts = _load_source_amounts(db, records)
     return [
         {
             "id": str(r.id),
             "payment_type": r.payment_type,
             "property_id": str(r.property_id),
+            "property_name": prop_names.get(str(r.property_id)),
             "source_id": str(r.source_id),
+            "amount": amounts.get(str(r.source_id)),
             "due_date": str(r.due_date) if r.due_date else None,
             "next_due_date": str(r.next_due_date) if r.next_due_date else None,
             "confirmed_at": str(r.confirmed_at),
@@ -198,3 +232,16 @@ def payment_history(
         }
         for r in records
     ]
+
+
+def _load_property_names(db: Session, ids: list) -> dict:
+    """Batch-load property names in ONE query (avoids N+1 lookups)."""
+    unique = {pid for pid in ids if pid}
+    if not unique:
+        return {}
+    placeholders = ",".join([f":p{i}" for i in range(len(unique))])
+    rows = db.execute(
+        text(f"SELECT id, name FROM properties WHERE id IN ({placeholders})"),
+        {f"p{i}": pid for i, pid in enumerate(unique)},
+    ).fetchall()
+    return {str(r[0]): str(r[1]) for r in rows}

@@ -14,6 +14,7 @@ const TABS = [
   { label: "Documents", href: "/documents" },
   { label: "Maintenance", href: "/maintenance" },
   { label: "Financials", href: "/financials" },
+  { label: "Payments", href: "/payments" },
 ] as const;
 
 export function PropertyTabs({ propertyId }: { propertyId: string }) {

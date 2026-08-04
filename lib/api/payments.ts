@@ -9,11 +9,15 @@ export interface PaymentConfirmResult {
   recorded_at: string;
 }
 
+export type PaymentType = "mortgage" | "insurance" | "tax";
+
 export interface PaymentHistoryItem {
   id: string;
-  payment_type: string;
+  payment_type: PaymentType;
   property_id: string;
+  property_name: string | null;
   source_id: string;
+  amount: number | null;
   due_date: string | null;
   next_due_date: string | null;
   confirmed_at: string;
@@ -21,7 +25,7 @@ export interface PaymentHistoryItem {
 }
 
 export function confirmPayment(
-  paymentType: "mortgage" | "insurance" | "tax",
+  paymentType: PaymentType,
   sourceId: string,
   dueDate?: string
 ): Promise<PaymentConfirmResult> {
@@ -34,7 +38,7 @@ export function confirmPayment(
 
 export function fetchPaymentHistory(
   propertyId?: string,
-  paymentType?: string
+  paymentType?: PaymentType
 ): Promise<PaymentHistoryItem[]> {
   const params = new URLSearchParams();
   if (propertyId) params.set("property_id", propertyId);

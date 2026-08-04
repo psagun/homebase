@@ -3,15 +3,16 @@
 import Link from "next/link";
 import { useDashboardSummary, useDashboardProperties } from "@/lib/hooks/useDashboard";
 import { useRecentlyViewed } from "@/lib/hooks/useRecentlyViewed";
+import { usePaymentHistory } from "@/lib/hooks/usePayments";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { useAuth } from "@/lib/auth/useAuth";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatRelativeDate } from "@/lib/utils";
 import {
   Home, TrendingUp, DollarSign, Receipt,
   AlertTriangle, Clock, ChevronRight, Bell,
-  Landmark, ShieldCheck, Building2, FileText, Wrench, Percent,
+  Landmark, ShieldCheck, Building2, FileText, Wrench, Percent, CreditCard,
 } from "lucide-react";
 
 const STATUS_COLORS: Record<string, string> = {
@@ -24,6 +25,7 @@ export default function DashboardPage() {
   const { data: stats, isLoading: statsLoading, isError: statsError, refetch: refetchStats } = useDashboardSummary();
   const { data: properties, isLoading: propsLoading, isError: propsError, refetch: refetchProps } = useDashboardProperties();
   const { properties: recentViewed, isLoading: recentLoading } = useRecentlyViewed();
+  const { data: payments } = usePaymentHistory();
 
   if (statsLoading || propsLoading) return <LoadingState text="Loading portfolio data..." />;
   if (statsError || propsError) return (
@@ -51,6 +53,14 @@ export default function DashboardPage() {
     if (status === "Overdue") return { Icon: AlertTriangle, bg: "#fef2f2", color: "#dc2626" };
     if (status === "Due Today") return { Icon: Clock, bg: "#fffbeb", color: "#d97706" };
     return { Icon: Bell, bg: "#eef2ff", color: "#3b82f6" };
+  };
+
+  const getPayIcon = (type: string) => {
+    const t = (type || "").toLowerCase();
+    if (t.includes("mortgage")) return { Icon: Landmark, bg: "#eef2ff", color: "#3b82f6" };
+    if (t.includes("insurance")) return { Icon: ShieldCheck, bg: "#faf5ff", color: "#9333ea" };
+    if (t.includes("tax")) return { Icon: Receipt, bg: "#fefce8", color: "#ca8a04" };
+    return { Icon: CreditCard, bg: "#eef2ff", color: "#3b82f6" };
   };
 
   return (
@@ -161,6 +171,36 @@ export default function DashboardPage() {
               </div>
             </div>
           ) : <div className="py-8 text-center text-sm text-muted-foreground">No data</div>}
+        </div>
+
+        {/* RECENT PAYMENTS */}
+        <div className="bg-card rounded-xl border border-border shadow-sm flex flex-col">
+          <div className="flex items-center justify-between px-5 pt-4 pb-3 border-b border-border">
+            <h2 className="text-sm font-semibold text-foreground">Recent Payments</h2>
+            <span className="text-xs text-muted-foreground">Confirmed by you</span>
+          </div>
+          <div className="divide-y divide-[#e8eaed]">
+            {payments && payments.length > 0 ? (
+              payments.slice(0, 5).map((p: any) => {
+                const { Icon, bg, color } = getPayIcon(p.payment_type);
+                const typeLabel = p.payment_type === "mortgage" ? "Mortgage" : p.payment_type === "insurance" ? "Insurance" : "Tax";
+                return (
+                  <Link key={p.id} href={`/properties/${p.property_id}/payments`}
+                    className="flex items-center gap-3 px-5 py-3 hover:bg-muted transition-colors group">
+                    <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg" style={{ backgroundColor: bg, color }}><Icon className="h-4 w-4" /></div>
+                    <div className="min-w-0 flex-1">
+                      <p className="text-sm font-medium text-foreground line-clamp-1 group-hover:text-primary transition-colors">
+                        {p.amount != null ? `${formatCurrency(p.amount)} · ` : ""}{typeLabel} payment
+                      </p>
+                      <p className="text-xs text-muted-foreground line-clamp-1">{p.property_name || "Property"}</p>
+                    </div>
+                    <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">{formatRelativeDate(p.confirmed_at)}</span>
+                    <ChevronRight className="h-4 w-4 text-muted-foreground group-hover:text-primary transition-colors shrink-0" />
+                  </Link>
+                );
+              })
+            ) : <div className="py-10 text-center text-sm text-muted-foreground">No confirmed payments yet</div>}
+          </div>
         </div>
       </div>
 
