@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
+import { PayPortalButton } from "@/components/shared/PayPortalButton";
 import { formatCurrency } from "@/lib/utils";
 
 interface TaxData {
@@ -320,11 +321,20 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
             <div className="flex items-center gap-2">
               {t.portal_url && /^https?:\/\//.test(t.portal_url) && (
                 <>
-                  <ConfirmPaymentButton paymentType="tax" sourceId={t.id} onConfirmed={() => loadTaxes()} />
-                  <Link href={t.portal_url} target="_blank" rel="noopener noreferrer"
-                    className="inline-flex items-center gap-2 rounded-md bg-[#00D632] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#00b82a] hover:shadow-md transition-all">
-                    <ExternalLink className="h-4 w-4" /> Pay Taxes
-                  </Link>
+                  <ConfirmPaymentButton
+                    paymentType="tax"
+                    sourceId={t.id}
+                    dueDate={t.next_due_date}
+                    label="tax"
+                    onConfirmed={() => loadTaxes()}
+                  />
+                  <PayPortalButton
+                    paymentType="tax"
+                    sourceId={t.id}
+                    url={t.portal_url}
+                    dueDate={t.next_due_date}
+                    label="Pay Taxes"
+                  />
                 </>
               )}
             </div>

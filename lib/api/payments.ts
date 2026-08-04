@@ -13,6 +13,7 @@ export interface PaymentHistoryItem {
   id: string;
   payment_type: string;
   property_id: string;
+  source_id: string;
   due_date: string | null;
   next_due_date: string | null;
   confirmed_at: string;
@@ -21,11 +22,14 @@ export interface PaymentHistoryItem {
 
 export function confirmPayment(
   paymentType: "mortgage" | "insurance" | "tax",
-  sourceId: string
+  sourceId: string,
+  dueDate?: string
 ): Promise<PaymentConfirmResult> {
-  return api.post<PaymentConfirmResult>(
-    `/payments/confirm?payment_type=${paymentType}&source_id=${sourceId}`
-  );
+  const params = new URLSearchParams();
+  params.set("payment_type", paymentType);
+  params.set("source_id", sourceId);
+  if (dueDate) params.set("due_date", dueDate);
+  return api.post<PaymentConfirmResult>(`/payments/confirm?${params.toString()}`);
 }
 
 export function fetchPaymentHistory(

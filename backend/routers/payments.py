@@ -73,6 +73,7 @@ def _get_source_record(db: Session, user_id: uuid.UUID, payment_type: str, sourc
 def confirm_payment(
     payment_type: str = Query(..., description="mortgage | insurance | tax"),
     source_id: uuid.UUID = Query(..., description="ID of the mortgage/insurance/tax record"),
+    due_date: date = Query(..., description="The payment cycle being confirmed (must match the record's current due date)"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
@@ -80,6 +81,11 @@ def confirm_payment(
 
     Never called automatically — always the result of explicit user
     confirmation after paying on the provider's website.
+
+    Idempotency guard: the caller must pass the exact due date of the cycle
+    they are confirming. If the record has already advanced past that cycle
+    (e.g. a double-confirm), the request is rejected — a payment cycle can
+    only ever be confirmed once.
     """
     row = _get_source_record(db, current_user.id, payment_type, source_id)
 
@@ -97,8 +103,15 @@ def confirm_payment(
     if not due:
         raise HTTPException(status_code=400, detail="No due date set for this record")
 
+    # Cycle guard: the confirmed due date must match the record's current due date.
+    # This prevents accidentally confirming the NEXT cycle (double-confirm).
+    if str(due) != str(due_date):
+        raise HTTPException(
+            status_code=409,
+            detail=f"This payment has already been confirmed. Current due date is {due}.",
+        )
+
     next_due = _next_due(due, frequency)
-    today = date.today()
 
     # Update the source record's due date
     if payment_type == "mortgage":
@@ -176,6 +189,7 @@ def payment_history(
             "id": str(r.id),
             "payment_type": r.payment_type,
             "property_id": str(r.property_id),
+            "source_id": str(r.source_id),
             "due_date": str(r.due_date) if r.due_date else None,
             "next_due_date": str(r.next_due_date) if r.next_due_date else None,
             "confirmed_at": str(r.confirmed_at),

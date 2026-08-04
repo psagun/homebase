@@ -10,6 +10,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
+import { PayPortalButton } from "@/components/shared/PayPortalButton";
 import { formatCurrency } from "@/lib/utils";
 import type { InsuranceCreateData } from "@/lib/api/insurance";
 
@@ -90,11 +91,22 @@ export default function InsurancePage({ params }: { params: { id: string } }) {
             <p className="text-xs text-muted-foreground">
               Paid on the provider&apos;s website? Confirm to advance your renewal date.
             </p>
-            <ConfirmPaymentButton
-              paymentType="insurance"
-              sourceId={policy.id}
-              onConfirmed={() => refetch()}
-            />
+            <div className="flex items-center gap-2">
+              <ConfirmPaymentButton
+                paymentType="insurance"
+                sourceId={policy.id}
+                dueDate={policy.renewal_date}
+                label="insurance"
+                onConfirmed={() => refetch()}
+              />
+              <PayPortalButton
+                paymentType="insurance"
+                sourceId={policy.id}
+                url={policy.portal_url}
+                dueDate={policy.renewal_date}
+                label="Pay Insurance"
+              />
+            </div>
           </div>
         )}
       </div>

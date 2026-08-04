@@ -9,6 +9,7 @@ import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
+import { PayPortalButton } from "@/components/shared/PayPortalButton";
 import { formatCurrency, formatDateFull } from "@/lib/utils";
 import type { MortgageCreateData } from "@/lib/api/mortgage";
 
@@ -125,11 +126,22 @@ export default function MortgagePage({ params }: { params: { id: string } }) {
             <p className="text-xs text-muted-foreground">
               Paid on the lender&apos;s website? Confirm to advance your next due date.
             </p>
-            <ConfirmPaymentButton
-              paymentType="mortgage"
-              sourceId={mortgage.id}
-              onConfirmed={() => refetch()}
-            />
+            <div className="flex items-center gap-2">
+              <ConfirmPaymentButton
+                paymentType="mortgage"
+                sourceId={mortgage.id}
+                dueDate={mortgage.next_due_date}
+                label="mortgage"
+                onConfirmed={() => refetch()}
+              />
+              <PayPortalButton
+                paymentType="mortgage"
+                sourceId={mortgage.id}
+                url={mortgage.portal_url}
+                dueDate={mortgage.next_due_date}
+                label="Pay Mortgage"
+              />
+            </div>
           </div>
         )}
       </div>

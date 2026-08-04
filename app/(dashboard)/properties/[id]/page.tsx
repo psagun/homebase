@@ -6,6 +6,8 @@ import { DollarSign, CalendarCheck, FileText, ShieldCheck, Wrench, Plus, Landmar
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
+import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
+import { PayPortalButton } from "@/components/shared/PayPortalButton";
 import { formatCurrency } from "@/lib/utils";
 
 interface ReminderItem {
@@ -40,7 +42,7 @@ function reminderIcon(r: ReminderItem): { icon: React.ReactNode; bg: string; col
 export default function PropertyOverviewPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property, isLoading, isError, refetch } = useProperty(id);
-  const [paymentLinks, setPaymentLinks] = useState<{ label: string; url: string; icon: React.ReactNode }[]>([]);
+  const [paymentLinks, setPaymentLinks] = useState<{ label: string; url: string; icon: React.ReactNode; type: "mortgage" | "insurance" | "tax"; id: string; dueDate?: string | null }[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [remindersLoading, setRemindersLoading] = useState(true);
 
@@ -71,12 +73,21 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
       fetch(`/api/v1/properties/${id}/insurance`, { credentials: "include" }).then(r => r.json()).catch(() => null),
       fetch(`/api/v1/properties/${id}/taxes`, { credentials: "include" }).then(r => r.json()).catch(() => null),
     ]).then(([mortgage, insurance, taxes]) => {
-      const links: { label: string; url: string; icon: React.ReactNode }[] = [];
-      if (mortgage?.portal_url) links.push({ label: "Pay Mortgage", url: mortgage.portal_url, icon: <Landmark className="h-4 w-4" /> });
-      if (insurance?.portal_url) links.push({ label: "Pay Insurance", url: insurance.portal_url, icon: <ShieldCheck className="h-4 w-4" /> });
+      const links: { label: string; url: string; icon: React.ReactNode; type: "mortgage" | "insurance" | "tax"; id: string; dueDate?: string | null }[] = [];
+      if (mortgage?.portal_url) links.push({
+        label: "Pay Mortgage", url: mortgage.portal_url, icon: <Landmark className="h-4 w-4" />,
+        type: "mortgage" as const, id: mortgage.id, dueDate: mortgage.next_due_date,
+      });
+      if (insurance?.portal_url) links.push({
+        label: "Pay Insurance", url: insurance.portal_url, icon: <ShieldCheck className="h-4 w-4" />,
+        type: "insurance" as const, id: insurance.id, dueDate: insurance.renewal_date,
+      });
       if (Array.isArray(taxes)) {
         const tax = taxes.find((t: any) => t?.portal_url && /^https?:\/\//.test(t.portal_url));
-        if (tax?.portal_url) links.push({ label: "Pay Taxes", url: tax.portal_url, icon: <Receipt className="h-4 w-4" /> });
+        if (tax?.portal_url) links.push({
+          label: "Pay Taxes", url: tax.portal_url, icon: <Receipt className="h-4 w-4" />,
+          type: "tax" as const, id: tax.id, dueDate: tax.next_due_date,
+        });
       }
       setPaymentLinks(links);
     });
@@ -207,10 +218,21 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
         <h2 className="text-base font-semibold mb-3">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
           {paymentLinks.length > 0 ? paymentLinks.map((link, i) => (
-            <a key={i} href={link.url} target="_blank" rel="noopener noreferrer"
-              className="inline-flex items-center gap-2 rounded-lg px-4 py-2.5 text-sm font-bold text-white shadow-md transition-all hover:shadow-lg hover:-translate-y-0.5 bg-[#00D632] hover:bg-[#00b82a]">
-              <ExternalLink className="h-4 w-4" /> {link.label}
-            </a>
+            <div key={i} className="flex items-center gap-2">
+              <PayPortalButton
+                paymentType={link.type}
+                sourceId={link.id}
+                url={link.url}
+                dueDate={link.dueDate}
+                label={link.label.replace("Pay ", "")}
+              />
+              <ConfirmPaymentButton
+                paymentType={link.type}
+                sourceId={link.id}
+                dueDate={link.dueDate}
+                label={link.type}
+              />
+            </div>
           )) : (
             <ActionButton icon={<DollarSign className="h-4 w-4" />} label="Make Payment" />
           )}
