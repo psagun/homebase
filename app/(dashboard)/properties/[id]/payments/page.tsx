@@ -2,12 +2,13 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Landmark, ShieldCheck, Receipt, CreditCard, CalendarCheck, ArrowRight } from "lucide-react";
-import { usePaymentHistory } from "@/lib/hooks/usePayments";
+import { Landmark, ShieldCheck, Receipt, CreditCard, CalendarCheck, ArrowRight, Undo2, CheckCircle2 } from "lucide-react";
+import { usePaymentHistory, useDeletePaymentHistory } from "@/lib/hooks/usePayments";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
+import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { formatCurrency, formatDate, formatDateFull, formatRelativeDate, capitalize } from "@/lib/utils";
 import type { PaymentHistoryItem, PaymentType } from "@/lib/api/payments";
 
@@ -28,7 +29,19 @@ export default function PaymentsPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property } = useProperty(id);
   const [filter, setFilter] = useState<PaymentType | "">("");
+  const [undoMsg, setUndoMsg] = useState<{ text: string; ok: boolean } | null>(null);
   const { data: records, isLoading, isError, refetch } = usePaymentHistory(id, filter || undefined);
+  const deletePayment = useDeletePaymentHistory();
+
+  // Records are ordered newest-first, so the first entry per source_id is
+  // its most recent confirmation — the only one that can be undone.
+  const undoableSourceIds = useMemo(() => {
+    const ids = new Set<string>();
+    for (const r of records ?? []) {
+      if (!ids.has(r.source_id)) ids.add(r.source_id);
+    }
+    return ids;
+  }, [records]);
 
   const summary = useMemo(() => {
     const items = records ?? [];
@@ -91,6 +104,17 @@ export default function PaymentsPage({ params }: { params: { id: string } }) {
         />
       </div>
 
+      {/* Undo result message */}
+      {undoMsg && (
+        <div className={`flex items-center gap-2 rounded-lg border px-4 py-3 text-sm ${
+          undoMsg.ok ? "border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-900/20 dark:text-emerald-400"
+                     : "border-red-200 bg-red-50 text-red-700 dark:border-red-900 dark:bg-red-900/20 dark:text-red-400"
+        }`}>
+          <CheckCircle2 className={`h-4 w-4 ${undoMsg.ok ? "" : "hidden"}`} />
+          {undoMsg.text}
+        </div>
+      )}
+
       {/* Type filter */}
       <div className="flex gap-2">
         {FILTERS.map((f) => (
@@ -130,7 +154,22 @@ export default function PaymentsPage({ params }: { params: { id: string } }) {
           <div className="absolute left-[15px] top-2 bottom-2 w-px bg-border" aria-hidden />
           <div className="space-y-3">
             {records.map((r) => (
-              <TimelineEntry key={r.id} record={r} propertyId={id} />
+              <TimelineEntry
+                key={r.id}
+                record={r}
+                propertyId={id}
+                canUndo={undoableSourceIds.has(r.source_id)}
+                onUndo={async () => {
+                  try {
+                    const result = await deletePayment.mutateAsync(r.id);
+                    setUndoMsg({ text: result.message, ok: true });
+                    setTimeout(() => setUndoMsg(null), 5000);
+                  } catch {
+                    setUndoMsg({ text: "Failed to undo payment. Please try again.", ok: false });
+                    setTimeout(() => setUndoMsg(null), 5000);
+                  }
+                }}
+              />
             ))}
           </div>
         </div>
@@ -139,7 +178,12 @@ export default function PaymentsPage({ params }: { params: { id: string } }) {
   );
 }
 
-function TimelineEntry({ record, propertyId }: { record: PaymentHistoryItem; propertyId: string }) {
+function TimelineEntry({ record, propertyId, canUndo, onUndo }: {
+  record: PaymentHistoryItem;
+  propertyId: string;
+  canUndo: boolean;
+  onUndo: () => void;
+}) {
   const meta = TYPE_META[record.payment_type] ?? TYPE_META.mortgage;
   const { Icon } = meta;
 
@@ -163,9 +207,24 @@ function TimelineEntry({ record, propertyId }: { record: PaymentHistoryItem; pro
               <span className="text-sm font-bold text-emerald-600">{formatCurrency(record.amount)}</span>
             )}
           </div>
-          <span className="text-xs text-muted-foreground" title={formatDateFull(record.confirmed_at)}>
-            Confirmed {formatRelativeDate(record.confirmed_at)}
-          </span>
+          <div className="flex items-center gap-2">
+            <span className="text-xs text-muted-foreground" title={formatDateFull(record.confirmed_at)}>
+              Confirmed {formatRelativeDate(record.confirmed_at)}
+            </span>
+            {canUndo && (
+              <ActionsMenu
+                label="Payment"
+                actions={[
+                  {
+                    label: "Undo Payment",
+                    icon: <Undo2 className="h-4 w-4" />,
+                    destructive: true,
+                    onClick: onUndo,
+                  },
+                ]}
+              />
+            )}
+          </div>
         </div>
 
         {/* Cycle: due → next due */}

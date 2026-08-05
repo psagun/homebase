@@ -7,6 +7,7 @@ confirmation and advances the next due date based on payment frequency.
 
 import uuid
 from datetime import date, datetime, timezone
+from types import SimpleNamespace
 
 from dateutil.relativedelta import relativedelta
 from fastapi import APIRouter, Depends, HTTPException, Query
@@ -33,30 +34,63 @@ def _next_due(due: date, frequency: str) -> date:
     return due + relativedelta(months=months)
 
 
+def _hex(uid) -> str:
+    """UUID as 32-char hex — the portable bind format for raw SQL.
+
+    SQLite stores postgresql.UUID columns as hex-without-dashes, while
+    Postgres accepts bare hex for uuid comparisons. Raw SQL must bind
+    this form (dashed strings silently fail to match on SQLite).
+    """
+    return str(uid).replace("-", "")
+
+
+def _as_uuid(value) -> uuid.UUID:
+    """Normalize a raw row value (uuid object or storage-format str) to uuid.UUID."""
+    return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
+
+def _as_date(value):
+    """Normalize a raw row date (date object or ISO str on SQLite) to date."""
+    if value is None or isinstance(value, date):
+        return value
+    return date.fromisoformat(str(value)[:10])
+
+
 def _get_source_record(db: Session, user_id: uuid.UUID, payment_type: str, source_id: uuid.UUID):
     """Fetch the mortgage/insurance/tax record, verifying the user owns its property."""
     from backend.models.property import Property
 
+    sid = _hex(source_id)
     if payment_type == "mortgage":
         row = db.execute(
             text("SELECT m.id, m.property_id, m.next_due_date, m.payment_frequency FROM mortgages m WHERE m.id = :id"),
-            {"id": source_id},
+            {"id": sid},
         ).first()
     elif payment_type == "insurance":
         row = db.execute(
             text("SELECT p.id, p.property_id, p.renewal_date, p.payment_frequency FROM insurance_policies p WHERE p.id = :id"),
-            {"id": source_id},
+            {"id": sid},
         ).first()
     elif payment_type == "tax":
         row = db.execute(
             text("SELECT t.id, t.property_id, t.next_due_date, t.payment_frequency FROM property_taxes t WHERE t.id = :id"),
-            {"id": source_id},
+            {"id": sid},
         ).first()
     else:
         raise HTTPException(status_code=400, detail="payment_type must be mortgage, insurance, or tax")
 
     if not row:
         raise HTTPException(status_code=404, detail=f"{payment_type} record not found")
+
+    # Raw text() rows carry storage-format values (hex32 str on SQLite, uuid
+    # on Postgres). Normalize the UUIDs so downstream ORM binds behave on both.
+    row = SimpleNamespace(
+        id=_as_uuid(row.id),
+        property_id=_as_uuid(row.property_id),
+        next_due_date=_as_date(getattr(row, "next_due_date", None)),
+        renewal_date=_as_date(getattr(row, "renewal_date", None)),
+        payment_frequency=row.payment_frequency,
+    )
 
     prop = db.query(Property).filter(
         Property.id == row.property_id,
@@ -113,21 +147,22 @@ def confirm_payment(
 
     next_due = _next_due(due, frequency)
 
-    # Update the source record's due date
+    # Update the source record's due date (dates as ISO str + hex UUID —
+    # sqlite3's driver only accepts scalars in raw text() params)
     if payment_type == "mortgage":
         db.execute(
             text("UPDATE mortgages SET next_due_date = :nd WHERE id = :id"),
-            {"nd": next_due, "id": source_id},
+            {"nd": str(next_due), "id": _hex(source_id)},
         )
     elif payment_type == "insurance":
         db.execute(
             text("UPDATE insurance_policies SET renewal_date = :nd WHERE id = :id"),
-            {"nd": next_due, "id": source_id},
+            {"nd": str(next_due), "id": _hex(source_id)},
         )
     else:
         db.execute(
             text("UPDATE property_taxes SET next_due_date = :nd WHERE id = :id"),
-            {"nd": next_due, "id": source_id},
+            {"nd": str(next_due), "id": _hex(source_id)},
         )
 
     # Sync the related task: advance due date, reset status to Upcoming.
@@ -142,7 +177,7 @@ def confirm_payment(
               AND status IN ('OVERDUE', 'DUE_TODAY', 'UPCOMING')
             """
         ),
-        {"nd": next_due, "pid": row.property_id, "tt": task_type_enum},
+        {"nd": str(next_due), "pid": _hex(row.property_id), "tt": task_type_enum},
     )
 
     # Record payment history
@@ -162,7 +197,7 @@ def confirm_payment(
 
     return {
         "status": "ok",
-        "message": f"Payment recorded successfully. Your next payment is due on {next_due.strftime('%B %-d, %Y').replace(' 0', ' ')}.",
+        "message": f"Payment recorded successfully. Your next payment is due on {next_due.strftime('%B %d, %Y').replace(' 0', ' ')}.",
         "next_due_date": str(next_due),
         "due_date": str(due),
         "source": "user_confirmed",
@@ -192,10 +227,10 @@ def _load_source_amounts(db: Session, records: list) -> dict:
         placeholders = ",".join([f":p{i}" for i in range(len(ids))])
         rows = db.execute(
             text(f"SELECT id, {col} FROM {table} WHERE id IN ({placeholders})"),
-            {f"p{i}": sid for i, sid in enumerate(ids)},
+            {f"p{i}": _hex(sid) for i, sid in enumerate(ids)},
         ).fetchall()
         for rid, amt in rows:
-            amounts[str(rid)] = float(amt) if amt is not None else None
+            amounts[_hex(rid)] = float(amt) if amt is not None else None
     return amounts
 
 
@@ -222,9 +257,9 @@ def payment_history(
             "id": str(r.id),
             "payment_type": r.payment_type,
             "property_id": str(r.property_id),
-            "property_name": prop_names.get(str(r.property_id)),
+            "property_name": prop_names.get(_hex(r.property_id)),
             "source_id": str(r.source_id),
-            "amount": amounts.get(str(r.source_id)),
+            "amount": amounts.get(_hex(r.source_id)),
             "due_date": str(r.due_date) if r.due_date else None,
             "next_due_date": str(r.next_due_date) if r.next_due_date else None,
             "confirmed_at": str(r.confirmed_at),
@@ -232,6 +267,94 @@ def payment_history(
         }
         for r in records
     ]
+
+
+@router.delete("/history/{history_id}")
+def undo_payment(
+    history_id: uuid.UUID,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Undo a confirmed payment — removes it from history and reverts the
+    source record's due date back to the confirmed cycle (and the task).
+
+    Only the MOST RECENT confirmation for a payment source can be undone.
+    Undoing an older cycle while a later one was already confirmed would
+    corrupt the due-date chain (the later confirmation legitimately
+    advanced the date further), so that case is rejected with a 409.
+    """
+    record = db.query(PaymentHistory).filter(
+        PaymentHistory.id == history_id,
+        PaymentHistory.user_id == current_user.id,
+    ).first()
+    if not record:
+        raise HTTPException(status_code=404, detail="Payment record not found")
+
+    later_exists = db.query(PaymentHistory).filter(
+        PaymentHistory.user_id == current_user.id,
+        PaymentHistory.source_id == record.source_id,
+        PaymentHistory.confirmed_at > record.confirmed_at,
+    ).first()
+    if later_exists:
+        raise HTTPException(
+            status_code=409,
+            detail="This payment is not the most recent one — undo the most recent payment first.",
+        )
+
+    # Revert the source record's due date to the confirmed cycle
+    # (dates as ISO str + hex UUID — sqlite3 only accepts scalars in raw params)
+    sid = _hex(record.source_id)
+    due_str = str(record.due_date)
+    if record.payment_type == "mortgage":
+        db.execute(
+            text("UPDATE mortgages SET next_due_date = :d WHERE id = :sid"),
+            {"d": due_str, "sid": sid},
+        )
+    elif record.payment_type == "insurance":
+        db.execute(
+            text("UPDATE insurance_policies SET renewal_date = :d WHERE id = :sid"),
+            {"d": due_str, "sid": sid},
+        )
+    elif record.payment_type == "tax":
+        db.execute(
+            text("UPDATE property_taxes SET next_due_date = :d WHERE id = :sid"),
+            {"d": due_str, "sid": sid},
+        )
+
+    # Re-sync the task: restore the due date and recompute status from today.
+    # task_type is a PostgreSQL enum — use the enum member names.
+    task_type_enum = {
+        "mortgage": "MORTGAGE_PAYMENT",
+        "insurance": "INSURANCE_RENEWAL",
+        "tax": "PROPERTY_TAX",
+    }[record.payment_type]
+    today = date.today()
+    if record.due_date < today:
+        task_status = "OVERDUE"
+    elif record.due_date == today:
+        task_status = "DUE_TODAY"
+    else:
+        task_status = "UPCOMING"
+    db.execute(
+        text(
+            """
+            UPDATE tasks
+            SET due_date = :d, status = :st
+            WHERE property_id = :pid AND task_type = :tt
+              AND status IN ('OVERDUE', 'DUE_TODAY', 'UPCOMING')
+            """
+        ),
+        {"d": due_str, "st": task_status, "pid": _hex(record.property_id), "tt": task_type_enum},
+    )
+
+    db.delete(record)
+    db.commit()
+
+    return {
+        "status": "ok",
+        "message": f"Payment for {record.due_date} undone. Due date restored to {record.due_date}.",
+        "due_date": str(record.due_date),
+    }
 
 
 def _load_property_names(db: Session, ids: list) -> dict:
@@ -242,6 +365,6 @@ def _load_property_names(db: Session, ids: list) -> dict:
     placeholders = ",".join([f":p{i}" for i in range(len(unique))])
     rows = db.execute(
         text(f"SELECT id, name FROM properties WHERE id IN ({placeholders})"),
-        {f"p{i}": pid for i, pid in enumerate(unique)},
+        {f"p{i}": _hex(pid) for i, pid in enumerate(unique)},
     ).fetchall()
-    return {str(r[0]): str(r[1]) for r in rows}
+    return {_hex(r[0]): str(r[1]) for r in rows}

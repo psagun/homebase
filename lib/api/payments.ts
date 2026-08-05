@@ -46,3 +46,13 @@ export function fetchPaymentHistory(
   const qs = params.toString();
   return api.get<PaymentHistoryItem[]>(`/payments/history${qs ? `?${qs}` : ""}`);
 }
+
+export interface PaymentUndoResult {
+  status: string;
+  message: string;
+  due_date: string;
+}
+
+export function deletePaymentHistory(id: string): Promise<PaymentUndoResult> {
+  return api.delete<PaymentUndoResult>(`/payments/history/${id}`);
+}
