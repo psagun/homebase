@@ -5,7 +5,6 @@ import uuid
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
@@ -284,70 +283,6 @@ def update_investor(
         role=user.role,
         property_ids=property_ids,
     )
-
-
-def _hex(uid) -> str:
-    """UUID as 32-char hex — portable bind format for raw SQL."""
-    return str(uid).replace("-", "")
-
-
-@router.post("/cleanup-archived")
-def cleanup_archived_properties(
-    apply: bool = Query(False, description="Apply deletion; default is a dry-run report"),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Delete archived properties and all of their attached data (dry-run unless apply=true).
-
-    Removes child rows first (tasks, mortgages, insurance, taxes,
-    transactions, tenants, maintenance, documents, payment history,
-    recently viewed, contacts, investor links), then the properties.
-    """
-    _require_admin(current_user)
-
-    props = db.execute(
-        text("SELECT id, user_id, name FROM properties WHERE archived_at IS NOT NULL")
-    ).fetchall()
-    if not props:
-        return {"status": "ok", "report": {"archived_properties": 0, "dry_run": not apply}}
-
-    prop_ids = [_hex(p[0]) for p in props]
-    placeholders = ",".join([f":p{i}" for i in range(len(prop_ids))])
-    params = {f"p{i}": pid for i, pid in enumerate(prop_ids)}
-
-    by_user: dict = {}
-    for p in props:
-        by_user[_hex(p[1])] = by_user.get(_hex(p[1]), 0) + 1
-    report = {
-        "dry_run": not apply,
-        "archived_properties": len(props),
-        "properties": [p[2] for p in props],
-        "per_user": by_user,
-    }
-
-    children = [
-        "payment_history", "recently_viewed", "property_contacts", "property_investors",
-        "documents", "maintenance_records", "tenants", "transactions",
-        "property_taxes", "insurance_policies", "mortgages", "tasks",
-    ]
-    for table in children:
-        count = db.execute(
-            text(f"SELECT COUNT(*) FROM {table} WHERE property_id IN ({placeholders})"),
-            params,
-        ).scalar()
-        report[f"{table}"] = count
-        if apply:
-            db.execute(
-                text(f"DELETE FROM {table} WHERE property_id IN ({placeholders})"),
-                params,
-            )
-
-    if apply:
-        for pid in prop_ids:
-            db.execute(text("DELETE FROM properties WHERE id = :i"), {"i": pid})
-        db.commit()
-
-    return {"status": "ok", "report": report}
 
 
 @router.post("/investors/{investor_id}/reset-password")
