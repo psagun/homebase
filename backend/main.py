@@ -3,14 +3,16 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
-from slowapi import _rate_limit_exceeded_handler
-from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from backend.config import settings
 from backend.database import Base, engine
-from backend.ratelimit import limiter
+from backend.ratelimit import limiter, _HAS_SLOWAPI
 from backend.routers.router import api_router
+
+if _HAS_SLOWAPI:
+    from slowapi import _rate_limit_exceeded_handler
+    from slowapi.errors import RateLimitExceeded
 
 
 class SecurityHeadersMiddleware(BaseHTTPMiddleware):
@@ -73,9 +75,10 @@ def create_app() -> FastAPI:
     app.add_middleware(DynamicCORSMiddleware)
     app.include_router(api_router)
 
-    # Rate limiting (production only)
-    app.state.limiter = limiter
-    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
+    # Rate limiting (production only, when slowapi is available)
+    if limiter is not None:
+        app.state.limiter = limiter
+        app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Serve uploaded files
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")

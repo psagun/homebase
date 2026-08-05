@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 from backend.config import settings
 from backend.dependencies import get_current_user, get_db
 from backend.models.user import User
-from backend.ratelimit import limiter
+from backend.ratelimit import rate_limit
 from backend.schemas.auth import (
     LoginRequest,
     RefreshRequest,
@@ -127,7 +127,7 @@ def _set_token_cookies(response: Response, data: dict) -> dict:
 
 
 @router.post("/register", response_model=TokenResponse)
-@limiter.limit("10/minute")
+@rate_limit("10/minute")
 def register(
     request: Request,
     data: RegisterRequest,
@@ -139,7 +139,7 @@ def register(
 
 
 @router.post("/login", response_model=TokenResponse)
-@limiter.limit("20/minute")
+@rate_limit("20/minute")
 def login(
     request: Request,
     data: LoginRequest,
@@ -151,7 +151,7 @@ def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
-@limiter.limit("30/minute")
+@rate_limit("30/minute")
 def refresh(
     request: Request,
     data: RefreshRequest,
