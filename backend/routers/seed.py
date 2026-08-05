@@ -979,15 +979,24 @@ def seed_database(key: str = Query(..., description="Seed secret key from CRON_S
             uid = demo_user.id
             props = _make_properties(db, uid)
 
-        # Seed all additional data
-        _make_mortgages(db, uid, props)
-        _make_insurance(db, uid, props)
-        _make_contacts(db, uid, props)
-        _make_tenants(db, uid, props)
-        _make_transactions(db, uid, props)
-        _make_tasks(db, uid, props)
-        _make_maintenance(db, uid, props)
-        _make_ownership(db, uid, props)
+        # Seed all additional data. The _make_* helpers index props by the
+        # ten canonical seed names; when seeding an existing user whose
+        # properties don't include all of them, a missing name would crash
+        # the whole seed. Skip that module instead — existing data stays.
+        for fn in (
+            _make_mortgages,
+            _make_insurance,
+            _make_contacts,
+            _make_tenants,
+            _make_transactions,
+            _make_tasks,
+            _make_maintenance,
+            _make_ownership,
+        ):
+            try:
+                fn(db, uid, props)
+            except KeyError:
+                continue
 
         db.commit()
 
