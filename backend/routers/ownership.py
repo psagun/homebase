@@ -54,12 +54,19 @@ def _get_property(user_id: uuid.UUID, property_id: uuid.UUID, db: Session) -> Pr
 # ─── Ownership Entity CRUD ───
 
 
+def _require_admin(user: User) -> None:
+    """Entities carry sensitive data (EINs) and are managed only by admins."""
+    if user.role != "admin":
+        raise HTTPException(status_code=403, detail="Admin privileges required")
+
+
 @router.get("/ownership-entities", response_model=list[EntityResponse])
 def list_entities(
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List all ownership entities (accessible to all authenticated users)."""
+    """List all ownership entities (admin only — includes EINs)."""
+    _require_admin(current_user)
     return db.query(OwnershipEntity).order_by(OwnershipEntity.name).all()
 
 
@@ -70,8 +77,7 @@ def create_entity(
     db: Session = Depends(get_db),
 ):
     """Create a new ownership entity."""
-    if current_user.role == "investor":
-        raise HTTPException(status_code=403, detail="Investors cannot create entities")
+    _require_admin(current_user)
     entity = OwnershipEntity(
         id=uuid.uuid4(),
         name=data.name,
@@ -93,6 +99,7 @@ def get_entity(
     db: Session = Depends(get_db),
 ):
     """Get a single ownership entity."""
+    _require_admin(current_user)
     entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -107,8 +114,7 @@ def update_entity(
     db: Session = Depends(get_db),
 ):
     """Update an ownership entity."""
-    if current_user.role == "investor":
-        raise HTTPException(status_code=403, detail="Investors cannot modify entities")
+    _require_admin(current_user)
     entity = db.query(OwnershipEntity).filter(OwnershipEntity.id == entity_id).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -129,8 +135,7 @@ def delete_entity(
     db: Session = Depends(get_db),
 ):
     """Delete an ownership entity (only if no properties reference it)."""
-    if current_user.role == "investor":
-        raise HTTPException(status_code=403, detail="Investors cannot delete entities")
+    _require_admin(current_user)
     from sqlalchemy import text
 
     # Check properties referencing this entity
@@ -163,6 +168,7 @@ def list_entity_investors(
     db: Session = Depends(get_db),
 ):
     """List investors in an ownership entity with their percentages."""
+    _require_admin(current_user)
     from sqlalchemy import text
 
     entity = db.execute(
@@ -211,8 +217,7 @@ def add_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Add an investor to an ownership entity."""
-    if current_user.role == "investor":
-        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
+    _require_admin(current_user)
     from decimal import Decimal
     from sqlalchemy import text
 
@@ -288,8 +293,7 @@ def update_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Update an investor's details or ownership percentage."""
-    if current_user.role == "investor":
-        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
+    _require_admin(current_user)
     from decimal import Decimal
     from sqlalchemy import text
 
@@ -362,8 +366,7 @@ def remove_entity_investor(
     db: Session = Depends(get_db),
 ):
     """Remove an investor from an ownership entity. Also cleans up PropertyInvestor links."""
-    if current_user.role == "investor":
-        raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
+    _require_admin(current_user)
     from sqlalchemy import text
 
     link = db.query(OwnershipEntityInvestor).filter(

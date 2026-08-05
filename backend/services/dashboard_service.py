@@ -40,6 +40,35 @@ def get_dashboard_summary(db: Session, user: User) -> dict[str, Any]:
     """Aggregate portfolio-level metrics from all data sources."""
     properties = _get_user_properties(db, user)
     property_ids = [p.id for p in properties]
+
+    # A user with no visible properties must get empty aggregates, NOT other
+    # tenants' tasks/mortgages — the task/policy queries below are only safe
+    # when scoped to the user's property ids.
+    if not property_ids:
+        return {
+            "total_properties": 0,
+            "total_value": 0,
+            "total_equity": 0,
+            "total_monthly_income": 0,
+            "total_monthly_expenses": 0,
+            "net_monthly_income": 0,
+            "average_roi": 0,
+            "occupancy_rate": 0,
+            "value_change_percentage": 0,
+            "occupied_count": 0,
+            "vacant_count": 0,
+            "total_purchase_price": 0,
+            "properties_by_status": [],
+            "value_by_type": [],
+            "recent_properties": [],
+            "reminders": [],
+            "overdue_count": 0,
+            "due_today_count": 0,
+            "mortgage_count": 0,
+            "total_monthly_mortgage_payment": 0,
+            "next_insurance_renewal": None,
+        }
+
     today = date.today()
 
     # ---- Property stats ----

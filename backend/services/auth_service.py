@@ -35,11 +35,15 @@ class AuthService:
                 detail="An account with this email already exists",
             )
 
+        # Security: self-registration must NOT grant admin privileges.
+        # Admin accounts are provisioned explicitly (seed/DB), never by
+        # public signup — otherwise anyone can register and manage investors.
         user = User(
             id=uuid.uuid4(),
             email=email,
             password_hash=_hash_password(password),
             name=name,
+            role="user",
         )
         self.db.add(user)
         self.db.commit()

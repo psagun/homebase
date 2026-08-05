@@ -3,10 +3,13 @@ from contextlib import asynccontextmanager
 
 from fastapi import FastAPI
 from fastapi.staticfiles import StaticFiles
+from slowapi import _rate_limit_exceeded_handler
+from slowapi.errors import RateLimitExceeded
 from starlette.middleware.base import BaseHTTPMiddleware
 from starlette.requests import Request
 from backend.config import settings
 from backend.database import Base, engine
+from backend.ratelimit import limiter
 from backend.routers.router import api_router
 
 
@@ -24,12 +27,20 @@ class SecurityHeadersMiddleware(BaseHTTPMiddleware):
 
 
 class DynamicCORSMiddleware(BaseHTTPMiddleware):
-    """Allow credentialed CORS from any localhost origin (any port)."""
+    """Allow credentialed CORS only from exact, configured origins.
+
+    Previously this matched any origin *containing* "localhost", which let
+    look-alike hosts (e.g. https://localhost.attacker.io) receive
+    credentialed CORS. Now the Origin must exactly match an entry in
+    settings.cors_origins (comma-separated).
+    """
+
+    ALLOWED_ORIGINS = {o.strip() for o in settings.cors_origins.split(",") if o.strip()}
 
     async def dispatch(self, request: Request, call_next):
         origin = request.headers.get("origin", "")
         response = await call_next(request)
-        if origin and ("localhost" in origin or "127.0.0.1" in origin):
+        if origin and origin in self.ALLOWED_ORIGINS:
             response.headers["Access-Control-Allow-Origin"] = origin
             response.headers["Access-Control-Allow-Credentials"] = "true"
             response.headers["Access-Control-Allow-Methods"] = "GET, POST, PATCH, DELETE, OPTIONS"
@@ -61,6 +72,10 @@ def create_app() -> FastAPI:
     app.add_middleware(SecurityHeadersMiddleware)
     app.add_middleware(DynamicCORSMiddleware)
     app.include_router(api_router)
+
+    # Rate limiting (production only)
+    app.state.limiter = limiter
+    app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
     # Serve uploaded files
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")

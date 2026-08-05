@@ -4,7 +4,7 @@ import uuid
 from datetime import date, timedelta
 
 import bcrypt
-from fastapi import APIRouter, Query
+from fastapi import APIRouter, Header, Query
 
 from backend.config import settings
 from backend.database import Base, SessionLocal, engine
@@ -923,9 +923,18 @@ def _make_ownership(db, uid, props):
 
 
 @router.get("")
-def seed_database(key: str = Query(..., description="Seed secret key from CRON_SECRET")):
-    """Seed the database with a full demo dataset."""
-    if key != settings.cron_secret:
+def seed_database(
+    key: str = Query(None, description="Seed secret key from CRON_SECRET (legacy query-param form)"),
+    x_cron_secret: str = Header(None, description="Seed secret in the X-Cron-Secret header"),
+):
+    """Seed the database with a full demo dataset.
+
+    The secret is read from the X-Cron-Secret header (preferred — query
+    params leak into access logs). The query-param form is kept for
+    backward compatibility.
+    """
+    secret = x_cron_secret or key
+    if secret != settings.cron_secret:
         return {"status": "error", "message": "Invalid seed key."}
 
     Base.metadata.create_all(bind=engine)
@@ -973,6 +982,9 @@ def seed_database(key: str = Query(..., description="Seed secret key from CRON_S
                     DEMO_PASSWORD.encode("utf-8"), bcrypt.gensalt()
                 ).decode("utf-8"),
                 name=DEMO_NAME,
+                # The demo account is the owner/admin — self-registration
+                # defaults to role "user", so seed explicitly grants admin.
+                role="admin",
             )
             db.add(demo_user)
             db.flush()

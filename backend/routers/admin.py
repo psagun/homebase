@@ -15,6 +15,11 @@ from backend.schemas.admin import InvestorCreate, InvestorResponse, InvestorUpda
 router = APIRouter()
 
 
+def _hex(uid) -> str:
+    """UUID as 32-char hex — portable bind format for raw SQL."""
+    return str(uid).replace("-", "")
+
+
 @router.get("/db-info")
 def db_info(
     current_user: User = Depends(get_current_user),
@@ -134,14 +139,16 @@ def suggest_properties_for_email(
     entity_ids = [r.entity_id for r in rows]
     entity_names = {str(r.entity_id): r.entity_name for r in rows}
 
-    # Find properties linked to those entities
+    # Find properties linked to those entities. Build explicit placeholders —
+    # binding a tuple to `IN :eids` makes the DBAPI driver reject the query.
+    placeholders = ",".join([f":e{i}" for i in range(len(entity_ids))])
     props = db.execute(
-        text("""
+        text(f"""
             SELECT id, name, ownership_entity_id
             FROM properties
-            WHERE ownership_entity_id IN :eids AND archived_at IS NULL
+            WHERE ownership_entity_id IN ({placeholders}) AND archived_at IS NULL
         """),
-        {"eids": tuple(entity_ids)},
+        {f"e{i}": _hex(eid) for i, eid in enumerate(entity_ids)},
     ).fetchall()
 
     return {

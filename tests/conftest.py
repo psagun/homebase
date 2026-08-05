@@ -40,7 +40,14 @@ def client():
 
 @pytest.fixture()
 def auth_client(client):
-    """Register and login a test user, return client with auth headers."""
+    """Register and login a test user, return client with auth headers.
+
+    Self-registration defaults to role "user" (security). Tests that
+    exercise admin surfaces promote the fixture user to admin directly in
+    the DB — the register endpoint itself must never grant admin.
+    """
+    from backend.models.user import User
+
     client.post("/api/v1/auth/register", json={
         "email": "test@homebase.app", "password": "testpass123", "name": "Test User",
     })
@@ -48,5 +55,13 @@ def auth_client(client):
         "email": "test@homebase.app", "password": "testpass123",
     })
     token = resp.json()["access_token"]
+
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.email == "test@homebase.app").first()
+    assert user
+    user.role = "admin"
+    db.commit()
+    db.close()
+
     client.headers = {**client.headers, "Authorization": f"Bearer {token}"}
     return client

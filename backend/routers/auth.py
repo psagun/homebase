@@ -1,13 +1,14 @@
 import bcrypt
 import os
 import uuid
-from fastapi import APIRouter, Depends, HTTPException, Response, UploadFile, File, status
+from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
 
 from backend.config import settings
 from backend.dependencies import get_current_user, get_db
 from backend.models.user import User
+from backend.ratelimit import limiter
 from backend.schemas.auth import (
     LoginRequest,
     RefreshRequest,
@@ -43,6 +44,18 @@ def change_password(
     return {"message": "Password updated successfully"}
 
 
+# Allowed image uploads: content-type -> file extension. The extension comes
+# from the MIME type, NEVER from the client-supplied filename — a trusted
+# extension prevents serving attacker-controlled HTML/SVG as same-origin.
+ALLOWED_AVATAR_TYPES = {
+    "image/png": ".png",
+    "image/jpeg": ".jpg",
+    "image/webp": ".webp",
+    "image/gif": ".gif",
+}
+MAX_AVATAR_BYTES = 2 * 1024 * 1024  # 2 MB
+
+
 @router.post("/avatar")
 async def upload_avatar(
     file: UploadFile = File(...),
@@ -50,19 +63,30 @@ async def upload_avatar(
     db: Session = Depends(get_db),
 ):
     """Upload a profile picture."""
-    ALLOWED = {"image/png", "image/jpeg", "image/webp", "image/gif"}
-    if file.content_type not in ALLOWED:
+    ext = ALLOWED_AVATAR_TYPES.get(file.content_type or "")
+    if not ext:
         raise HTTPException(status_code=400, detail="Only PNG, JPEG, WebP, and GIF images are allowed")
+
+    # Read in chunks and reject oversized files before buffering them all
+    chunks = []
+    size = 0
+    while True:
+        chunk = await file.read(64 * 1024)
+        if not chunk:
+            break
+        size += len(chunk)
+        if size > MAX_AVATAR_BYTES:
+            raise HTTPException(status_code=413, detail="Image is too large (max 2 MB)")
+        chunks.append(chunk)
+    content = b"".join(chunks)
 
     # Ensure uploads dir exists
     upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads", "avatars")
     os.makedirs(upload_dir, exist_ok=True)
 
-    # Save file
-    ext = os.path.splitext(file.filename or "avatar.png")[1] or ".png"
+    # Save file — extension derived from the validated MIME type
     filename = f"{uuid.uuid4()}{ext}"
     filepath = os.path.join(upload_dir, filename)
-    content = await file.read()
     with open(filepath, "wb") as f:
         f.write(content)
 
@@ -75,12 +99,18 @@ async def upload_avatar(
 
 
 def _set_token_cookies(response: Response, data: dict) -> dict:
-    """Set auth tokens as HTTP-only cookies on the response."""
+    """Set auth tokens as HTTP-only cookies on the response.
+
+    `secure` is only enabled in production so local HTTP development still
+    works; tokens must never ride cleartext on a public deployment.
+    """
+    secure = settings.environment == "production"
     response.set_cookie(
         key="access_token",
         value=data["access_token"],
         httponly=True,
         samesite="lax",
+        secure=secure,
         max_age=settings.access_token_expire_minutes * 60,
         path="/",
     )
@@ -89,6 +119,7 @@ def _set_token_cookies(response: Response, data: dict) -> dict:
         value=data["refresh_token"],
         httponly=True,
         samesite="lax",
+        secure=secure,
         max_age=settings.refresh_token_expire_days * 86400,
         path="/api/v1/auth",
     )
@@ -96,7 +127,9 @@ def _set_token_cookies(response: Response, data: dict) -> dict:
 
 
 @router.post("/register", response_model=TokenResponse)
+@limiter.limit("10/minute")
 def register(
+    request: Request,
     data: RegisterRequest,
     response: Response,
     auth: AuthService = Depends(get_auth_service),
@@ -106,7 +139,9 @@ def register(
 
 
 @router.post("/login", response_model=TokenResponse)
+@limiter.limit("20/minute")
 def login(
+    request: Request,
     data: LoginRequest,
     response: Response,
     auth: AuthService = Depends(get_auth_service),
@@ -116,7 +151,9 @@ def login(
 
 
 @router.post("/refresh", response_model=TokenResponse)
+@limiter.limit("30/minute")
 def refresh(
+    request: Request,
     data: RefreshRequest,
     response: Response,
     auth: AuthService = Depends(get_auth_service),

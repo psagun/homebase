@@ -35,10 +35,7 @@ from backend.models import User, Property, Mortgage, InsurancePolicy, Document, 
 try:
     Base.metadata.create_all(bind=engine)
     _migrate_add_column(engine, "users", "notifications_read_at", "TIMESTAMP WITH TIME ZONE")
-    _migrate_add_column(engine, "users", "role", "VARCHAR(20)")
-    with engine.connect() as conn:
-        conn.execute(text("UPDATE users SET role = 'admin' WHERE role IS NULL"))
-        conn.commit()
+    _migrate_add_column(engine, "users", "role", "VARCHAR(20) DEFAULT 'user'")
     _migrate_add_column(engine, "properties", "ownership_entity_id", "UUID")
     _migrate_add_column(engine, "contacts", "is_favorite", "BOOLEAN DEFAULT FALSE")
     _migrate_add_column(engine, "maintenance_records", "category", "VARCHAR(50)")
