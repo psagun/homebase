@@ -202,7 +202,6 @@ def test_dashboard_summary_empty_for_propertyless_user(client, auth_client):
 # ── Config fail-fast ──
 
 
-@pytest.mark.skip(reason="validator temporarily softened to print-only while prod secrets are audited; restore with the raise")
 def test_settings_reject_default_secrets_in_production(monkeypatch):
     """Production must fail fast when secrets are left at their defaults."""
     from pydantic import ValidationError
