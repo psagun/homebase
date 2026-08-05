@@ -45,13 +45,15 @@ def list_properties(
 
     if status:
         status_enum = _parse_enum(PropertyStatus, status)
-        if status_enum:
-            query = query.filter(Property.status == status_enum)
+        if status_enum is None:
+            raise HTTPException(status_code=422, detail=f"Invalid status: {status}")
+        query = query.filter(Property.status == status_enum)
 
     if property_type:
         type_enum = _parse_enum(PropertyType, property_type)
-        if type_enum:
-            query = query.filter(Property.property_type == type_enum)
+        if type_enum is None:
+            raise HTTPException(status_code=422, detail=f"Invalid property_type: {property_type}")
+        query = query.filter(Property.property_type == type_enum)
 
     if search:
         term = f"%{search}%"

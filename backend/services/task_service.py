@@ -43,8 +43,9 @@ def list_tasks(
 
     if status:
         status_enum = _parse_enum(TaskStatus, status.title().replace("_", " "))
-        if status_enum:
-            query = query.filter(Task.status == status_enum)
+        if status_enum is None:
+            raise HTTPException(status_code=422, detail=f"Invalid status: {status}")
+        query = query.filter(Task.status == status_enum)
     if task_type:
         type_enum = _parse_enum(TaskType, task_type)
         if type_enum:

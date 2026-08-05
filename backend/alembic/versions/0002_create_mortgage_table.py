@@ -39,7 +39,8 @@ def upgrade() -> None:
         sa.Column("created_at", sa.DateTime(timezone=True), nullable=False),
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
-    op.create_index("ix_mortgages_property_id", "mortgages", ["property_id"])
+    # property_id/is_active carry index=True above (implicit indexes);
+    # only the composite active index needs creating here.
     op.create_index("ix_mortgages_active", "mortgages", ["property_id", "is_active"])
 
 

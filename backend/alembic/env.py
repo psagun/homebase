@@ -12,8 +12,8 @@ config = context.config
 if config.config_file_name is not None:
     fileConfig(config.config_file_name)
 
-# Import all models so Alembic discovers them
-from backend.models import Property, User  # noqa: F401, E402
+# Import ALL models so Alembic discovers them (models/__init__ imports every table)
+import backend.models  # noqa: F401, E402
 
 target_metadata = Base.metadata
 
@@ -31,6 +31,13 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
+    # Allow overriding the DB via DATABASE_URL (prod deploy uses env, not ini)
+    import os
+
+    db_url = os.environ.get("DATABASE_URL")
+    if db_url:
+        config.set_main_option("sqlalchemy.url", db_url)
+
     connectable = engine_from_config(
         config.get_section(config.config_ini_section, {}),
         prefix="sqlalchemy.",

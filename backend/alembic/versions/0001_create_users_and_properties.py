@@ -64,7 +64,8 @@ def upgrade() -> None:
         sa.Column("updated_at", sa.DateTime(timezone=True), nullable=False),
     )
 
-    op.create_index("ix_properties_user_id", "properties", ["user_id"])
+    # Note: properties.user_id is created with index=True above — its index
+    # is emitted with the table, so only the status index is created here.
     op.create_index("ix_properties_status", "properties", ["status"])
 
 
