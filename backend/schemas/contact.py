@@ -2,6 +2,8 @@ import uuid
 from datetime import datetime
 from typing import Optional
 
+import uuid
+
 from pydantic import BaseModel, Field, field_serializer
 
 
@@ -14,7 +16,7 @@ class ContactCreate(BaseModel):
     notes: Optional[str] = None
     contact_type: str = "Other"
     is_favorite: bool = False
-    property_ids: Optional[list[str]] = None
+    property_ids: Optional[list[uuid.UUID]] = None
 
 
 class ContactUpdate(BaseModel):
@@ -41,7 +43,7 @@ class ContactResponse(BaseModel):
     is_favorite: bool = False
     created_at: datetime
     updated_at: datetime
-    property_ids: Optional[list[str]] = None
+    property_ids: Optional[list[uuid.UUID]] = None
 
     model_config = {"from_attributes": True}
 

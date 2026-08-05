@@ -61,19 +61,23 @@ def _get_source_record(db: Session, user_id: uuid.UUID, payment_type: str, sourc
     from backend.models.property import Property
 
     sid = _hex(source_id)
+    # FOR UPDATE locks the source row so two concurrent confirmations of
+    # the same cycle can't both pass the due-date guard. SQLite rejects
+    # the clause, so it is added only on PostgreSQL.
+    lock = " FOR UPDATE" if db.get_bind().dialect.name == "postgresql" else ""
     if payment_type == "mortgage":
         row = db.execute(
-            text("SELECT m.id, m.property_id, m.next_due_date, m.payment_frequency FROM mortgages m WHERE m.id = :id"),
+            text("SELECT m.id, m.property_id, m.next_due_date, m.payment_frequency FROM mortgages m WHERE m.id = :id" + lock),
             {"id": sid},
         ).first()
     elif payment_type == "insurance":
         row = db.execute(
-            text("SELECT p.id, p.property_id, p.renewal_date, p.payment_frequency FROM insurance_policies p WHERE p.id = :id"),
+            text("SELECT p.id, p.property_id, p.renewal_date, p.payment_frequency FROM insurance_policies p WHERE p.id = :id" + lock),
             {"id": sid},
         ).first()
     elif payment_type == "tax":
         row = db.execute(
-            text("SELECT t.id, t.property_id, t.next_due_date, t.payment_frequency FROM property_taxes t WHERE t.id = :id"),
+            text("SELECT t.id, t.property_id, t.next_due_date, t.payment_frequency FROM property_taxes t WHERE t.id = :id" + lock),
             {"id": sid},
         ).first()
     else:
@@ -238,17 +242,24 @@ def _load_source_amounts(db: Session, records: list) -> dict:
 def payment_history(
     property_id: uuid.UUID = Query(None, description="Filter to a property"),
     payment_type: str = Query(None, description="mortgage | insurance | tax"),
+    offset: int = Query(0, ge=0, description="Skip this many records"),
+    limit: int = Query(50, ge=1, le=200, description="Max records to return"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
 ):
-    """List user-confirmed payment history."""
+    """List user-confirmed payment history (paginated)."""
     query = db.query(PaymentHistory).filter(PaymentHistory.user_id == current_user.id)
     if property_id:
         query = query.filter(PaymentHistory.property_id == property_id)
     if payment_type:
         query = query.filter(PaymentHistory.payment_type == payment_type)
 
-    records = query.order_by(PaymentHistory.confirmed_at.desc()).limit(50).all()
+    records = (
+        query.order_by(PaymentHistory.confirmed_at.desc())
+        .offset(offset)
+        .limit(limit)
+        .all()
+    )
 
     prop_names = _load_property_names(db, [r.property_id for r in records])
     amounts = _load_source_amounts(db, records)

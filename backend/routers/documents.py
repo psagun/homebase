@@ -2,7 +2,7 @@ import uuid
 from typing import Optional
 
 from fastapi import APIRouter, Depends, HTTPException, Query, UploadFile, File, status
-from fastapi.responses import FileResponse
+from fastapi.responses import FileResponse, RedirectResponse
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
@@ -56,7 +56,13 @@ def download_document(
     doc_id: uuid.UUID,
     current_user: User = Depends(get_current_user), db: Session = Depends(get_db),
 ):
-    doc, path = document_service.get_document_path(db, current_user.id, doc_id)
+    # Production files live in Supabase Storage — redirect to a signed URL
+    # (files are not on the serverless FS, so FileResponse would 404).
+    # Local dev falls back to the on-disk file.
+    doc, signed_url = document_service.get_signed_url(db, current_user.id, doc_id)
+    if signed_url:
+        return RedirectResponse(signed_url)
+    path = document_storage_service.get_file_path(doc.storage_key)
     return FileResponse(path, filename=doc.name, media_type="application/octet-stream")
 
 

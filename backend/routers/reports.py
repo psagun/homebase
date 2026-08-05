@@ -1,6 +1,7 @@
 """Financial report endpoints — P&L, cash flow, YTD, annual."""
 
 import uuid
+from datetime import date
 from typing import Optional
 
 from fastapi import APIRouter, Depends, Query
@@ -15,8 +16,8 @@ router = APIRouter(prefix="/reports", tags=["reports"])
 
 @router.get("/pnl")
 def get_pnl(
-    from_date: Optional[str] = Query(None, description="Start date (ISO format, e.g. 2026-01-01)"),
-    to_date: Optional[str] = Query(None, description="End date (ISO format, e.g. 2026-12-31)"),
+    from_date: Optional[date] = Query(None, description="Start date (ISO format, e.g. 2026-01-01)"),
+    to_date: Optional[date] = Query(None, description="End date (ISO format, e.g. 2026-12-31)"),
     property_id: Optional[uuid.UUID] = Query(None, description="Filter to a single property"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),
@@ -29,8 +30,8 @@ def get_pnl(
 
 @router.get("/cash-flow")
 def get_cash_flow(
-    from_date: Optional[str] = Query(None, description="Start date (ISO format)"),
-    to_date: Optional[str] = Query(None, description="End date (ISO format)"),
+    from_date: Optional[date] = Query(None, description="Start date (ISO format)"),
+    to_date: Optional[date] = Query(None, description="End date (ISO format)"),
     property_id: Optional[uuid.UUID] = Query(None, description="Filter to a single property"),
     current_user: User = Depends(get_current_user),
     db: Session = Depends(get_db),

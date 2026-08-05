@@ -9,6 +9,7 @@ from backend.config import settings
 from backend.dependencies import get_current_user, get_db
 from backend.models.user import User
 from backend.ratelimit import rate_limit
+from backend.services import document_storage_service
 from backend.schemas.auth import (
     LoginRequest,
     RefreshRequest,
@@ -80,18 +81,27 @@ async def upload_avatar(
         chunks.append(chunk)
     content = b"".join(chunks)
 
-    # Ensure uploads dir exists
-    upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads", "avatars")
-    os.makedirs(upload_dir, exist_ok=True)
-
-    # Save file — extension derived from the validated MIME type
+    # Extension derived from the validated MIME type
     filename = f"{uuid.uuid4()}{ext}"
-    filepath = os.path.join(upload_dir, filename)
-    with open(filepath, "wb") as f:
-        f.write(content)
+
+    # Production: store in Supabase Storage (serverless FS is read-only).
+    # avatar_url stores the storage key ("avatars/<file>"); display needs a
+    # signed-URL fetch (frontend pass).
+    if document_storage_service.is_supabase_configured():
+        key = document_storage_service.upload_bytes(
+            content, filename, content_type=file.content_type, folder="avatars"
+        )
+        avatar_url = key
+    else:
+        # Local dev fallback — lazy dir creation
+        upload_dir = os.path.join(os.path.dirname(__file__), "..", "..", "..", "uploads", "avatars")
+        os.makedirs(upload_dir, exist_ok=True)
+        filepath = os.path.join(upload_dir, filename)
+        with open(filepath, "wb") as f:
+            f.write(content)
+        avatar_url = f"/uploads/avatars/{filename}"
 
     # Update user
-    avatar_url = f"/uploads/avatars/{filename}"
     current_user.avatar_url = avatar_url
     db.commit()
 

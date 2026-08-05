@@ -13,29 +13,25 @@ from backend.models.transaction import Transaction, TransactionType
 
 
 def _get_date_range(
-    from_date: str | None,
-    to_date: str | None,
+    from_date: date | None,
+    to_date: date | None,
 ) -> tuple[date, date]:
-    """Resolve from/to dates, defaulting to current year to-date."""
+    """Resolve from/to dates, defaulting to current year to-date.
+
+    Dates arrive already parsed (FastAPI `date` query params → 422 on
+    invalid input); this only applies defaults.
+    """
     today = date.today()
-    if from_date:
-        parsed_from = date.fromisoformat(from_date)
-    else:
-        parsed_from = date(today.year, 1, 1)
-
-    if to_date:
-        parsed_to = date.fromisoformat(to_date)
-    else:
-        parsed_to = today
-
+    parsed_from = from_date or date(today.year, 1, 1)
+    parsed_to = to_date or today
     return parsed_from, parsed_to
 
 
 def get_pnl(
     db: Session,
     user_id: uuid.UUID,
-    from_date: str | None = None,
-    to_date: str | None = None,
+    from_date: date | None = None,
+    to_date: date | None = None,
     property_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:
     """Profit & Loss statement within a date range.
@@ -143,7 +139,7 @@ def get_pnl(
 def get_cash_flow(
     db: Session,
     user_id: uuid.UUID,
-    from_date: str | None = None,
+    from_date: date | None = None,
     to_date: str | None = None,
     property_id: uuid.UUID | None = None,
 ) -> dict[str, Any]:

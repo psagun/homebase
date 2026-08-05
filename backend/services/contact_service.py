@@ -44,7 +44,7 @@ def create_contact(db: Session, user_id, data) -> Contact:
 
     if data.property_ids:
         props = db.query(Property).filter(
-            Property.id.in_([uuid.UUID(id) for id in data.property_ids]),
+            Property.id.in_(data.property_ids),
             Property.user_id == user_id,
         ).all()
         contact.properties = props

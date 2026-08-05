@@ -27,6 +27,17 @@ from backend.schemas.ownership import (
 router = APIRouter(tags=["ownership"])
 
 
+def _hex(uid) -> str:
+    """UUID as 32-char hex — portable bind format for raw SQL (SQLite
+    stores postgresql.UUID as hex32; Postgres accepts bare hex too)."""
+    return str(uid).replace("-", "")
+
+
+def _as_uuid(value) -> uuid.UUID:
+    """Normalize a raw row value (uuid object or hex32 str) to uuid.UUID."""
+    return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
+
 def _get_property(user_id: uuid.UUID, property_id: uuid.UUID, db: Session) -> Property:
     from backend.models.property_investor import PropertyInvestor
     # Check investor access first
@@ -141,7 +152,7 @@ def delete_entity(
     # Check properties referencing this entity
     refs = db.execute(
         text("SELECT id FROM properties WHERE ownership_entity_id = :eid AND archived_at IS NULL"),
-        {"eid": entity_id},
+        {"eid": _hex(entity_id)},
     ).fetchall()
     if refs:
         raise HTTPException(
@@ -173,7 +184,7 @@ def list_entity_investors(
 
     entity = db.execute(
         text("SELECT 1 FROM ownership_entities WHERE id = :eid"),
-        {"eid": entity_id},
+        {"eid": _hex(entity_id)},
     ).first()
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
@@ -186,27 +197,31 @@ def list_entity_investors(
             WHERE oei.ownership_entity_id = :eid
             ORDER BY oei.ownership_percentage DESC
         """),
-        {"eid": entity_id},
+        {"eid": _hex(entity_id)},
     ).fetchall()
 
-    result = []
-    for row in rows:
-        portal = False
-        if row.email:
-            portal_user = db.execute(
-                text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
-                {"email": row.email},
-            ).first()
-            portal = portal_user is not None
-        result.append({
+    # Batch portal-access check: one query for all investor emails (no N+1)
+    emails = [r.email for r in rows if r.email]
+    portal_emails = set()
+    if emails:
+        placeholders = ",".join([f":e{i}" for i in range(len(emails))])
+        portal_rows = db.execute(
+            text(f"SELECT email FROM users WHERE role = 'investor' AND LOWER(email) IN ({placeholders})"),
+            {f"e{i}": e.lower() for i, e in enumerate(emails)},
+        ).fetchall()
+        portal_emails = {str(r[0]).lower() for r in portal_rows}
+
+    return [
+        {
             "id": str(row.id),
             "name": row.name,
             "email": row.email,
             "phone": row.phone,
             "ownership_percentage": float(row.ownership_percentage),
-            "portal_access": portal,
-        })
-    return result
+            "portal_access": bool(row.email and row.email.lower() in portal_emails),
+        }
+        for row in rows
+    ]
 
 
 @router.post("/ownership-entities/{entity_id}/investors", status_code=201)
@@ -225,10 +240,16 @@ def add_entity_investor(
     if not entity:
         raise HTTPException(status_code=404, detail="Entity not found")
 
-    # Check total
+    # Lock the entity row so concurrent adds can't both pass the 100% check
+    # (SQLite rejects FOR UPDATE, so it is added only on PostgreSQL)
+    lock = " FOR UPDATE" if db.get_bind().dialect.name == "postgresql" else ""
+    db.execute(
+        text("SELECT 1 FROM ownership_entities WHERE id = :eid" + lock),
+        {"eid": _hex(entity_id)},
+    )
     existing_total = db.execute(
         text("SELECT COALESCE(SUM(ownership_percentage), 0) FROM ownership_entity_investors WHERE ownership_entity_id = :eid"),
-        {"eid": entity_id},
+        {"eid": _hex(entity_id)},
     ).scalar()
 
     if float(existing_total) + data.ownership_percentage > 100:
@@ -240,11 +261,11 @@ def add_entity_investor(
     inv_id = uuid.uuid4()
     db.execute(
         text("INSERT INTO investors (id, name, email, phone) VALUES (:id, :name, :email, :phone)"),
-        {"id": inv_id, "name": data.name, "email": data.email, "phone": data.phone},
+        {"id": _hex(inv_id), "name": data.name, "email": data.email, "phone": data.phone},
     )
     db.execute(
         text("INSERT INTO ownership_entity_investors (ownership_entity_id, investor_id, ownership_percentage) VALUES (:eid, :iid, :pct)"),
-        {"eid": entity_id, "iid": inv_id, "pct": Decimal(str(data.ownership_percentage))},
+        {"eid": _hex(entity_id), "iid": _hex(inv_id), "pct": float(data.ownership_percentage)},
     )
 
     # Auto-link portal access if email matches a User
@@ -255,21 +276,21 @@ def add_entity_investor(
             {"email": data.email},
         ).first()
         if portal_user:
-            portal_user_id = str(portal_user.id)
+            portal_user_id = _as_uuid(portal_user.id)
             # Get all properties linked to this entity
             prop_ids = db.execute(
                 text("SELECT id FROM properties WHERE ownership_entity_id = :eid AND archived_at IS NULL"),
-                {"eid": entity_id},
+                {"eid": _hex(entity_id)},
             ).fetchall()
             for prop_row in prop_ids:
                 existing = db.execute(
                     text("SELECT 1 FROM property_investors WHERE property_id = :pid AND user_id = :uid"),
-                    {"pid": prop_row[0], "uid": portal_user.id},
+                    {"pid": _hex(prop_row[0]), "uid": _hex(portal_user.id)},
                 ).first()
                 if not existing:
                     db.execute(
                         text("INSERT INTO property_investors (property_id, user_id) VALUES (:pid, :uid)"),
-                        {"pid": prop_row[0], "uid": portal_user.id},
+                        {"pid": _hex(prop_row[0]), "uid": _hex(portal_user.id)},
                     )
 
     db.commit()
@@ -300,7 +321,7 @@ def update_entity_investor(
     # Verify link exists
     link = db.execute(
         text("SELECT * FROM ownership_entity_investors WHERE ownership_entity_id = :eid AND investor_id = :iid"),
-        {"eid": entity_id, "iid": investor_id},
+        {"eid": _hex(entity_id), "iid": _hex(investor_id)},
     ).first()
     if not link:
         raise HTTPException(status_code=404, detail="Investor not found in this entity")
@@ -308,9 +329,15 @@ def update_entity_investor(
     update_data = data.model_dump(exclude_unset=True)
 
     if "ownership_percentage" in update_data:
+        # Lock the entity row so concurrent updates can't exceed 100%
+        lock = " FOR UPDATE" if db.get_bind().dialect.name == "postgresql" else ""
+        db.execute(
+            text("SELECT 1 FROM ownership_entities WHERE id = :eid" + lock),
+            {"eid": _hex(entity_id)},
+        )
         other_total = db.execute(
             text("SELECT COALESCE(SUM(ownership_percentage), 0) FROM ownership_entity_investors WHERE ownership_entity_id = :eid AND investor_id != :iid"),
-            {"eid": entity_id, "iid": investor_id},
+            {"eid": _hex(entity_id), "iid": _hex(investor_id)},
         ).scalar()
 
         if float(other_total) + update_data["ownership_percentage"] > 100:
@@ -320,12 +347,12 @@ def update_entity_investor(
             )
         db.execute(
             text("UPDATE ownership_entity_investors SET ownership_percentage = :pct WHERE ownership_entity_id = :eid AND investor_id = :iid"),
-            {"pct": Decimal(str(update_data["ownership_percentage"])), "eid": entity_id, "iid": investor_id},
+            {"pct": float(update_data["ownership_percentage"]), "eid": _hex(entity_id), "iid": _hex(investor_id)},
         )
 
     # Build UPDATE for investors table
     set_clauses = []
-    params = {"id": investor_id}
+    params = {"id": _hex(investor_id)}
     for key in ("name", "email", "phone"):
         if key in update_data:
             set_clauses.append(f"{key} = :{key}")
@@ -342,11 +369,11 @@ def update_entity_investor(
     # Fetch updated data
     inv = db.execute(
         text("SELECT id, name, email, phone FROM investors WHERE id = :id"),
-        {"id": investor_id},
+        {"id": _hex(investor_id)},
     ).first()
     pct = db.execute(
         text("SELECT ownership_percentage FROM ownership_entity_investors WHERE ownership_entity_id = :eid AND investor_id = :iid"),
-        {"eid": entity_id, "iid": investor_id},
+        {"eid": _hex(entity_id), "iid": _hex(investor_id)},
     ).scalar()
 
     return {
@@ -394,7 +421,7 @@ def remove_entity_investor(
                         SELECT id FROM properties WHERE ownership_entity_id = :eid
                     )
                 """),
-                {"uid": portal_user.id, "eid": entity_id},
+                {"uid": _hex(portal_user.id), "eid": _hex(entity_id)},
             )
 
     db.delete(link)
@@ -423,7 +450,7 @@ def get_property_ownership(
 
     entity_row = db.execute(
         text("SELECT id, name, entity_type, ein, state_of_formation, status, created_at, updated_at FROM ownership_entities WHERE id = :eid"),
-        {"eid": prop.ownership_entity_id},
+        {"eid": _hex(prop.ownership_entity_id)},
     ).first()
     if not entity_row:
         return {
@@ -441,8 +468,19 @@ def get_property_ownership(
             WHERE oei.ownership_entity_id = :eid
             ORDER BY oei.ownership_percentage DESC
         """),
-        {"eid": prop.ownership_entity_id},
+        {"eid": _hex(prop.ownership_entity_id)},
     ).fetchall()
+
+    # Batch portal-access check (one query, no N+1)
+    emails = [r.email for r in investor_rows if r.email]
+    portal_emails = set()
+    if emails:
+        placeholders = ",".join([f":e{i}" for i in range(len(emails))])
+        portal_rows = db.execute(
+            text(f"SELECT email FROM users WHERE role = 'investor' AND LOWER(email) IN ({placeholders})"),
+            {f"e{i}": e.lower() for i, e in enumerate(emails)},
+        ).fetchall()
+        portal_emails = {str(r[0]).lower() for r in portal_rows}
 
     return {
         "property_id": str(property_id),
@@ -464,10 +502,7 @@ def get_property_ownership(
                 "email": r.email,
                 "phone": r.phone,
                 "ownership_percentage": float(r.ownership_percentage),
-                "portal_access": db.execute(
-                    text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
-                    {"email": r.email},
-                ).first() is not None if r.email else False,
+                "portal_access": bool(r.email and r.email.lower() in portal_emails),
             }
             for r in investor_rows
         ],
@@ -490,14 +525,14 @@ def set_property_ownership_entity(
 
     entity_row = db.execute(
         text("SELECT id, name, entity_type, ein, state_of_formation, status, created_at, updated_at FROM ownership_entities WHERE id = :eid"),
-        {"eid": data.ownership_entity_id},
+        {"eid": _hex(data.ownership_entity_id)},
     ).first()
     if not entity_row:
         raise HTTPException(status_code=404, detail="Entity not found")
 
     db.execute(
         text("UPDATE properties SET ownership_entity_id = :eid WHERE id = :pid"),
-        {"eid": data.ownership_entity_id, "pid": property_id},
+        {"eid": _hex(data.ownership_entity_id), "pid": _hex(property_id)},
     )
 
     # Link this property to portal users who are investors in this entity
@@ -508,17 +543,17 @@ def set_property_ownership_entity(
             JOIN users u ON u.email = i.email AND u.role = 'investor'
             WHERE oei.ownership_entity_id = :eid
         """),
-        {"eid": data.ownership_entity_id},
+        {"eid": _hex(data.ownership_entity_id)},
     ).fetchall()
     for link in portal_links:
         existing = db.execute(
             text("SELECT 1 FROM property_investors WHERE property_id = :pid AND user_id = :uid"),
-            {"pid": property_id, "uid": link.user_id},
+            {"pid": _hex(property_id), "uid": _hex(link.user_id)},
         ).first()
         if not existing:
             db.execute(
                 text("INSERT INTO property_investors (property_id, user_id) VALUES (:pid, :uid)"),
-                {"pid": property_id, "uid": link.user_id},
+                {"pid": _hex(property_id), "uid": _hex(link.user_id)},
             )
 
     db.commit()
@@ -531,8 +566,19 @@ def set_property_ownership_entity(
             WHERE oei.ownership_entity_id = :eid
             ORDER BY oei.ownership_percentage DESC
         """),
-        {"eid": data.ownership_entity_id},
+        {"eid": _hex(data.ownership_entity_id)},
     ).fetchall()
+
+    # Batch portal-access check (one query, no N+1)
+    emails = [r.email for r in investor_rows if r.email]
+    portal_emails = set()
+    if emails:
+        placeholders = ",".join([f":e{i}" for i in range(len(emails))])
+        portal_rows = db.execute(
+            text(f"SELECT email FROM users WHERE role = 'investor' AND LOWER(email) IN ({placeholders})"),
+            {f"e{i}": e.lower() for i, e in enumerate(emails)},
+        ).fetchall()
+        portal_emails = {str(r[0]).lower() for r in portal_rows}
 
     return {
         "property_id": str(property_id),
@@ -554,10 +600,7 @@ def set_property_ownership_entity(
                 "email": r.email,
                 "phone": r.phone,
                 "ownership_percentage": float(r.ownership_percentage),
-                "portal_access": db.execute(
-                    text("SELECT 1 FROM users WHERE email = :email AND role = 'investor'"),
-                    {"email": r.email},
-                ).first() is not None if r.email else False,
+                "portal_access": bool(r.email and r.email.lower() in portal_emails),
             }
             for r in investor_rows
         ],
@@ -575,10 +618,20 @@ def remove_property_ownership_entity(
         raise HTTPException(status_code=403, detail="Investors cannot modify ownership")
     from sqlalchemy import text
     prop = _get_property(current_user.id, property_id, db)
-    # Remove PropertyInvestor links for this property (cleanup)
-    db.execute(
-        text("DELETE FROM property_investors WHERE property_id = :pid"),
-        {"pid": property_id},
-    )
+    # Remove only the portal links that were derived from this entity's
+    # investors — manually granted links must survive.
+    if prop.ownership_entity_id:
+        db.execute(
+            text("""
+                DELETE FROM property_investors
+                WHERE property_id = :pid AND user_id IN (
+                    SELECT u.id FROM ownership_entity_investors oei
+                    JOIN investors i ON i.id = oei.investor_id
+                    JOIN users u ON u.email = i.email AND u.role = 'investor'
+                    WHERE oei.ownership_entity_id = :eid
+                )
+            """),
+            {"pid": _hex(property_id), "eid": _hex(prop.ownership_entity_id)},
+        )
     prop.ownership_entity_id = None
     db.commit()

@@ -130,6 +130,16 @@ def import_properties(
     skipped = 0
     errors: list[dict] = []
 
+    # Preload the user's existing (name, address) pairs once — checking per
+    # row with a query would be N queries on a large import.
+    existing_pairs = {
+        (r[0], r[1])
+        for r in db.query(Property.name, Property.address_line_1).filter(
+            Property.user_id == current_user.id,
+            Property.archived_at.is_(None),
+        ).all()
+    }
+
     for row_idx, row in enumerate(reader, start=2):
         try:
             # Normalize keys
@@ -150,16 +160,21 @@ def import_properties(
                 errors.append({"row": row_idx, "reason": "Missing required fields: address_line_1, city, state, postal_code"})
                 continue
 
-            # Check for duplicate by name+address
-            existing = db.query(Property).filter(
-                Property.user_id == current_user.id,
-                Property.name == name,
-                Property.address_line_1 == address,
-                Property.archived_at.is_(None),
-            ).first()
-            if existing:
+            # Check for duplicate by name+address (in-memory set)
+            if (name, address) in existing_pairs:
                 skipped += 1
                 errors.append({"row": row_idx, "reason": f"Duplicate property: {name}"})
+                continue
+
+            # A provided but unparsable price must fail the row loudly —
+            # silently importing $0 corrupts portfolio totals.
+            price_raw = normalized.get("purchase_price", "")
+            value_raw = normalized.get("current_value", "")
+            purchase_price = _parse_decimal(price_raw) if price_raw else Decimal("0")
+            current_value = _parse_decimal(value_raw) if value_raw else Decimal("0")
+            if (price_raw and purchase_price is None) or (value_raw and current_value is None):
+                skipped += 1
+                errors.append({"row": row_idx, "reason": f"Invalid price value: purchase_price={price_raw!r} current_value={value_raw!r}"})
                 continue
 
             ptype = normalized.get("property_type", "Single Family")
@@ -184,16 +199,24 @@ def import_properties(
                 property_type=ptype_enum,
                 status=status_enum,
                 purchase_date=_parse_date(normalized.get("purchase_date", "")),
-                purchase_price=_parse_decimal(normalized.get("purchase_price", "0")) or Decimal("0"),
-                current_value=_parse_decimal(normalized.get("current_value", "0")) or Decimal("0"),
+                purchase_price=purchase_price,
+                current_value=current_value,
                 lot_size=_parse_decimal(normalized.get("lot_size", "")),
                 bedrooms=_parse_int(normalized.get("bedrooms", "")),
                 bathrooms=_parse_decimal(normalized.get("bathrooms", "")),
                 year_built=_parse_int(normalized.get("year_built", "")),
                 notes=normalized.get("notes"),
             )
-            db.add(prop)
-            db.flush()
+            # SAVEPOINT per row: on Postgres one failed flush poisons the
+            # whole transaction — roll back to the savepoint instead.
+            try:
+                with db.begin_nested():
+                    db.add(prop)
+                    db.flush()
+            except Exception:
+                db.expunge(prop)
+                raise
+            existing_pairs.add((name, address))
             imported += 1
 
         except Exception as e:

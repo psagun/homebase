@@ -5,6 +5,7 @@ import uuid
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query, status
+from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
@@ -200,11 +201,25 @@ def create_investor(
     db.add(user)
     db.flush()  # get the user ID before assigning properties
 
-    # Assign properties
+    # Assign properties — validate every id exists and belongs to the admin
     assigned_ids = set(data.property_ids or [])
+    if assigned_ids:
+        placeholders = ",".join([f":p{i}" for i in range(len(assigned_ids))])
+        valid = {
+            _hex(r[0])
+            for r in db.execute(
+                text(f"SELECT id FROM properties WHERE user_id = :u AND id IN ({placeholders})"),
+                {"u": _hex(current_user.id), **{f"p{i}": _hex(pid) for i, pid in enumerate(assigned_ids)}},
+            ).fetchall()
+        }
+        missing = {str(p) for p in assigned_ids if _hex(p) not in valid}
+        if missing:
+            raise HTTPException(
+                status_code=400,
+                detail=f"Unknown property ids: {', '.join(sorted(missing)[:5])}",
+            )
 
     # Auto-link properties from ownership entity membership (email match)
-    from sqlalchemy import text
     auto_rows = db.execute(
         text("""
             SELECT DISTINCT p.id AS prop_id
@@ -263,6 +278,23 @@ def update_investor(
         user.name = data.name
 
     if data.property_ids is not None:
+        # Validate every id exists and belongs to the admin
+        if data.property_ids:
+            placeholders = ",".join([f":p{i}" for i in range(len(data.property_ids))])
+            valid = {
+                _hex(r[0])
+                for r in db.execute(
+                    text(f"SELECT id FROM properties WHERE user_id = :u AND id IN ({placeholders})"),
+                    {"u": _hex(current_user.id), **{f"p{i}": _hex(pid) for i, pid in enumerate(data.property_ids)}},
+                ).fetchall()
+            }
+            missing = {str(p) for p in data.property_ids if _hex(p) not in valid}
+            if missing:
+                raise HTTPException(
+                    status_code=400,
+                    detail=f"Unknown property ids: {', '.join(sorted(missing)[:5])}",
+                )
+
         # Remove existing assignments
         db.query(PropertyInvestor).filter(
             PropertyInvestor.user_id == user.id

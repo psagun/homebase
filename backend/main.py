@@ -80,10 +80,14 @@ def create_app() -> FastAPI:
         app.state.limiter = limiter
         app.add_exception_handler(RateLimitExceeded, _rate_limit_exceeded_handler)
 
-    # Serve uploaded files
+    # Serve uploaded files. Guarded: the serverless FS is read-only and the
+    # dir is absent from the bundle, so a hard mount would crash cold start.
     uploads_dir = os.path.join(os.path.dirname(__file__), "..", "uploads")
-    os.makedirs(uploads_dir, exist_ok=True)
-    app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    try:
+        os.makedirs(uploads_dir, exist_ok=True)
+        app.mount("/uploads", StaticFiles(directory=uploads_dir), name="uploads")
+    except OSError:
+        pass  # read-only FS — uploads go to Supabase Storage in production
 
     return app
 

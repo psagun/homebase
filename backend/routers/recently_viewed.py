@@ -65,6 +65,21 @@ def record_view(
     if not prop:
         raise HTTPException(status_code=404, detail="Property not found")
 
+    # Only the owner or a linked investor may record a view — otherwise any
+    # authenticated user could enumerate property existence via this endpoint
+    from backend.models.property_investor import PropertyInvestor
+
+    is_investor_link = (
+        current_user.role == "investor"
+        and db.query(PropertyInvestor).filter(
+            PropertyInvestor.property_id == pid,
+            PropertyInvestor.user_id == current_user.id,
+        ).first()
+        is not None
+    )
+    if prop.user_id != current_user.id and not is_investor_link:
+        raise HTTPException(status_code=404, detail="Property not found")
+
     # Delete old entries for this property by this user (upsert behavior)
     db.query(RecentlyViewed).filter(
         RecentlyViewed.user_id == current_user.id,
@@ -75,15 +90,16 @@ def record_view(
     rv = RecentlyViewed(user_id=current_user.id, property_id=pid, viewed_at=datetime.now(timezone.utc))
     db.add(rv)
 
-    # Keep only the last MAX_ITEMS
-    all_rows = (
-        db.query(RecentlyViewed)
-        .filter(RecentlyViewed.user_id == current_user.id)
-        .order_by(RecentlyViewed.viewed_at.desc())
-        .all()
-    )
-    for old in all_rows[MAX_ITEMS:]:
-        db.delete(old)
+    # Keep only the last MAX_ITEMS — one DELETE instead of loading all rows
+    db.query(RecentlyViewed).filter(
+        RecentlyViewed.user_id == current_user.id,
+        ~RecentlyViewed.id.in_(
+            db.query(RecentlyViewed.id)
+            .filter(RecentlyViewed.user_id == current_user.id)
+            .order_by(RecentlyViewed.viewed_at.desc())
+            .limit(MAX_ITEMS)
+        ),
+    ).delete(synchronize_session=False)
 
     db.commit()
     return {"status": "ok"}
