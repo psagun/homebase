@@ -1,4 +1,5 @@
 """Notifications endpoint — aggregates data from tasks, insurance, mortgages."""
+import uuid
 from datetime import date, datetime, timedelta, timezone
 
 from fastapi import APIRouter, Depends
@@ -18,18 +19,32 @@ router = APIRouter()
 
 def _get_visible_property_ids(db: Session, user: User) -> list:
     """Get property IDs visible to this user based on role."""
+    # Normalize raw row values (hex32 str on SQLite) to uuid.UUID so the
+    # ORM IN() binds work on both dialects
+    def _as_uuid(value):
+        return value if isinstance(value, uuid.UUID) else uuid.UUID(str(value))
+
     if user.role == "investor":
         rows = db.execute(
             text("SELECT property_id FROM property_investors WHERE user_id = :uid"),
-            {"uid": user.id},
+            {"uid": _hex(user.id)},
         ).fetchall()
-        return [r[0] for r in rows]
+        return [_as_uuid(r[0]) for r in rows]
     else:
         rows = db.execute(
             text("SELECT id FROM properties WHERE user_id = :uid AND archived_at IS NULL"),
-            {"uid": user.id},
+            {"uid": _hex(user.id)},
         ).fetchall()
-        return [r[0] for r in rows]
+        return [_as_uuid(r[0]) for r in rows]
+
+
+def _hex(uid) -> str:
+    """UUID as 32-char hex — portable bind/key format for raw SQL.
+
+    SQLite stores UUID columns as hex-without-dashes; Postgres accepts
+    bare hex too, so this form works on both dialects.
+    """
+    return str(uid).replace("-", "")
 
 
 def _load_property_names(db: Session, ids: list) -> dict:
@@ -37,11 +52,12 @@ def _load_property_names(db: Session, ids: list) -> dict:
     unique = {pid for pid in ids if pid}
     if not unique:
         return {}
+    placeholders = ",".join([f":p{i}" for i in range(len(unique))])
     rows = db.execute(
-        text(f"SELECT id, name FROM properties WHERE id IN ({','.join([':p%d' % i for i in range(len(unique))])})"),
-        {f"p{i}": pid for i, pid in enumerate(unique)},
+        text(f"SELECT id, name FROM properties WHERE id IN ({placeholders})"),
+        {f"p{i}": _hex(pid) for i, pid in enumerate(unique)},
     ).fetchall()
-    return {str(r[0]): str(r[1]) for r in rows}
+    return {_hex(r[0]): str(r[1]) for r in rows}
 
 
 @router.post("/read")
@@ -102,13 +118,22 @@ def get_notifications(
         + [m.property_id for m in mortgages]
     )
     prop_names = _load_property_names(db, all_prop_ids)
-    name_of = lambda pid: f" — {prop_names.get(str(pid), '')}" if pid and prop_names.get(str(pid)) else ""
+
+    def name_of(pid, title=""):
+        """Property name suffix; omitted when the title already carries it
+        (seed titles follow the '<task> - <Property Name>' convention)."""
+        name = prop_names.get(_hex(pid)) if pid else None
+        if not name:
+            return ""
+        if title.endswith(f" - {name}"):
+            return ""
+        return f" — {name}"
 
     # Overdue tasks
     for t in overdue_tasks:
         notifications.append({
             "id": f"task-overdue-{t.id}",
-            "title": f"Overdue: {t.title}{name_of(t.property_id)}",
+            "title": f"Overdue: {t.title}{name_of(t.property_id, t.title)}",
             "type": "task_overdue", "severity": "error",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
             "read": False, "date": str(t.due_date or ""),
@@ -118,7 +143,7 @@ def get_notifications(
     for t in due_today_tasks:
         notifications.append({
             "id": f"task-today-{t.id}",
-            "title": f"Due today: {t.title}{name_of(t.property_id)}",
+            "title": f"Due today: {t.title}{name_of(t.property_id, t.title)}",
             "type": "task_due_today", "severity": "warning",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
             "read": False, "date": str(t.due_date or ""),
@@ -128,7 +153,7 @@ def get_notifications(
     for t in upcoming_tasks:
         notifications.append({
             "id": f"task-upcoming-{t.id}",
-            "title": f"Upcoming: {t.title}{name_of(t.property_id)}",
+            "title": f"Upcoming: {t.title}{name_of(t.property_id, t.title)}",
             "type": "task_upcoming", "severity": "info",
             "link": f"/properties/{t.property_id}" if t.property_id else "/tasks",
             "read": False, "date": str(t.due_date or ""),

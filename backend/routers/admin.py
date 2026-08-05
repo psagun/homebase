@@ -5,7 +5,6 @@ import uuid
 
 import bcrypt
 from fastapi import APIRouter, Depends, HTTPException, Query, status
-from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
@@ -284,91 +283,6 @@ def update_investor(
         role=user.role,
         property_ids=property_ids,
     )
-
-
-def _hex(uid) -> str:
-    """UUID as 32-char hex — portable bind format for raw SQL."""
-    return str(uid).replace("-", "")
-
-
-@router.post("/repair-demo-data")
-def repair_demo_data(
-    apply: bool = Query(False, description="Apply fixes; default is a dry-run report"),
-    current_user: User = Depends(get_current_user),
-    db: Session = Depends(get_db),
-):
-    """Repair the demo user's task data (dry-run unless apply=true).
-
-    Old seed versions created tasks for the demo user whose property links
-    drifted to properties the user no longer owns (or that belong to other
-    users). Such tasks are invisible-or-broken in the UI and pollute
-    notifications with mismatched names. This endpoint:
-      1. Deletes tasks/transactions whose property is not owned by the demo user
-      2. Re-titles tasks so the trailing "- <name>" matches the linked property
-    """
-    _require_admin(current_user)
-    from backend.models.user import User as DemoUser
-
-    demo = db.query(DemoUser).filter(DemoUser.email == "demo@homebase.app").first()
-    if not demo:
-        return {"status": "ok", "message": "No demo user found", "dry_run": not apply}
-
-    owned_ids = {
-        _hex(r[0])
-        for r in db.execute(
-            text("SELECT id FROM properties WHERE user_id = :u"),
-            {"u": _hex(demo.id)},
-        ).fetchall()
-    }
-    name_by_id = {
-        _hex(r[0]): r[1]
-        for r in db.execute(
-            text("SELECT id, name FROM properties WHERE user_id = :u"),
-            {"u": _hex(demo.id)},
-        ).fetchall()
-    }
-
-    report = {"demo_user": demo.email, "dry_run": not apply, "owned_properties": len(owned_ids)}
-
-    # 1. Orphaned tasks / transactions linked to properties the user doesn't own
-    for table in ("tasks", "transactions"):
-        rows = db.execute(
-            text(f"SELECT id, property_id FROM {table} WHERE user_id = :u"),
-            {"u": _hex(demo.id)},
-        ).fetchall()
-        orphans = [r for r in rows if _hex(r[1]) not in owned_ids]
-        if apply:
-            for r in orphans:
-                db.execute(
-                    text(f"DELETE FROM {table} WHERE id = :i"),
-                    {"i": _hex(r[0])},
-                )
-        report[f"{table}_orphaned"] = len(orphans)
-
-    # 2. Tasks whose title suffix doesn't match the linked property name
-    rows = db.execute(
-        text("SELECT id, title, property_id FROM tasks WHERE user_id = :u"),
-        {"u": _hex(demo.id)},
-    ).fetchall()
-    renames = []
-    for tid, title, pid in rows:
-        prop_name = name_by_id.get(_hex(pid))
-        if not prop_name or " - " not in title:
-            continue
-        prefix, _, suffix = title.rpartition(" - ")
-        if suffix != prop_name:
-            renames.append((title, f"{prefix} - {prop_name}"))
-            if apply:
-                db.execute(
-                    text("UPDATE tasks SET title = :t WHERE id = :i"),
-                    {"t": f"{prefix} - {prop_name}", "i": _hex(tid)},
-                )
-    report["tasks_retitled"] = len(renames)
-    report["renames"] = renames[:20]
-
-    if apply:
-        db.commit()
-    return {"status": "ok", "report": report}
 
 
 @router.post("/investors/{investor_id}/reset-password")
