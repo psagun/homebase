@@ -78,20 +78,32 @@ def get_cash_flow(db: Session, user_id, property_id, year: int | None = None) ->
     if year:
         query = query.filter(extract("year", Transaction.transaction_date) == year)
 
-    txns = query.all()
-    total_income = sum(float(t.amount) for t in txns if t.transaction_type == TransactionType.INCOME)
-    total_expenses = sum(float(t.amount) for t in txns if t.transaction_type == TransactionType.EXPENSE)
-
-    # By category
+    # Aggregate in SQL - bounded result set regardless of row count
+    rows = (
+        query.with_entities(
+            Transaction.category,
+            Transaction.transaction_type,
+            func.sum(Transaction.amount),
+            func.count(Transaction.id),
+        )
+        .group_by(Transaction.category, Transaction.transaction_type)
+        .all()
+    )
+    total_income = 0.0
+    total_expenses = 0.0
     income_by_category: dict[str, float] = {}
     expense_by_category: dict[str, float] = {}
-    for t in txns:
-        cat = t.category.value if hasattr(t.category, "value") else str(t.category)
-        amt = float(t.amount)
-        if t.transaction_type == TransactionType.INCOME:
-            income_by_category[cat] = income_by_category.get(cat, 0) + amt
+    txn_count = 0
+    for cat, ttype, amt, cnt in rows:
+        cat_label = cat.value if hasattr(cat, "value") else str(cat)
+        amount = float(amt or 0)
+        txn_count += int(cnt or 0)
+        if ttype == TransactionType.INCOME:
+            total_income += amount
+            income_by_category[cat_label] = income_by_category.get(cat_label, 0) + amount
         else:
-            expense_by_category[cat] = expense_by_category.get(cat, 0) + amt
+            total_expenses += amount
+            expense_by_category[cat_label] = expense_by_category.get(cat_label, 0) + amount
 
     return {
         "total_income": round(total_income, 2),
@@ -99,5 +111,5 @@ def get_cash_flow(db: Session, user_id, property_id, year: int | None = None) ->
         "net_cash_flow": round(total_income - total_expenses, 2),
         "income_by_category": [{"category": k, "amount": round(v, 2)} for k, v in sorted(income_by_category.items())],
         "expense_by_category": [{"category": k, "amount": round(v, 2)} for k, v in sorted(expense_by_category.items())],
-        "transaction_count": len(txns),
+        "transaction_count": txn_count,
     }

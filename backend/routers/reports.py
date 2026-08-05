@@ -24,7 +24,7 @@ def get_pnl(
 ):
     """Profit & Loss statement for a date range."""
     return report_service.get_pnl(
-        db, current_user.id, from_date=from_date, to_date=to_date, property_id=property_id,
+        db, current_user, from_date=from_date, to_date=to_date, property_id=property_id,
     )
 
 
@@ -38,7 +38,7 @@ def get_cash_flow(
 ):
     """Monthly cash flow data for charting."""
     return report_service.get_cash_flow(
-        db, current_user.id, from_date=from_date, to_date=to_date, property_id=property_id,
+        db, current_user, from_date=from_date, to_date=to_date, property_id=property_id,
     )
 
 
@@ -49,7 +49,7 @@ def get_ytd(
     db: Session = Depends(get_db),
 ):
     """Year-to-date summary vs prior year."""
-    return report_service.get_ytd(db, current_user.id, property_id=property_id)
+    return report_service.get_ytd(db, current_user, property_id=property_id)
 
 
 @router.get("/annual")
@@ -60,4 +60,4 @@ def get_annual(
     db: Session = Depends(get_db),
 ):
     """Full-year monthly P&L breakdown."""
-    return report_service.get_annual(db, current_user.id, year=year, property_id=property_id)
+    return report_service.get_annual(db, current_user, year=year, property_id=property_id)

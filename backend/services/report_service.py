@@ -1,15 +1,20 @@
-"""Financial report aggregation service — P&L, cash flow, YTD, and annual reports."""
+"""Financial report aggregation service — P&L, cash flow, YTD, and annual reports.
 
-import uuid
+Aggregations run in SQL (GROUP BY / SUM) — the previous version pulled
+every transaction into Python, which is O(N) rows transferred per report
+request. Only the (small) grouped result set is iterated now.
+"""
+
 from datetime import date
 from typing import Any
 
-from sqlalchemy import extract
+from sqlalchemy import extract, func
 from sqlalchemy.orm import Session
 
 from backend.models.maintenance_record import MaintenanceRecord
 from backend.models.property import Property
 from backend.models.transaction import Transaction, TransactionType
+from backend.models.user import User
 
 
 def _get_date_range(
@@ -27,77 +32,108 @@ def _get_date_range(
     return parsed_from, parsed_to
 
 
+def _scoped_txn_query(db: Session, user: User, from_d: date, to_d: date, property_id=None):
+    """Transaction query scoped to what this user can see.
+
+    Investors see transactions of their linked properties; everyone else
+    sees their own. Used by every report — keeps the scoping in one place.
+    """
+    from backend.models.property_investor import PropertyInvestor
+
+    q = db.query(Transaction).join(Property)
+    if user.role == "investor":
+        q = q.join(PropertyInvestor, PropertyInvestor.property_id == Property.id).filter(
+            PropertyInvestor.user_id == user.id,
+            Property.archived_at.is_(None),
+        )
+    else:
+        q = q.filter(
+            Property.user_id == user.id,
+            Property.archived_at.is_(None),
+        )
+    q = q.filter(
+        Transaction.transaction_date >= from_d,
+        Transaction.transaction_date <= to_d,
+    )
+    if property_id:
+        q = q.filter(Transaction.property_id == property_id)
+    return q
+
+
+def _scoped_maint_query(db: Session, user: User, from_d: date, to_d: date, property_id=None):
+    """Maintenance-cost query with the same scoping as transactions."""
+    from backend.models.property_investor import PropertyInvestor
+
+    q = db.query(MaintenanceRecord).join(Property)
+    if user.role == "investor":
+        q = q.join(PropertyInvestor, PropertyInvestor.property_id == Property.id).filter(
+            PropertyInvestor.user_id == user.id,
+            Property.archived_at.is_(None),
+        )
+    else:
+        q = q.filter(
+            Property.user_id == user.id,
+            Property.archived_at.is_(None),
+        )
+    q = q.filter(
+        MaintenanceRecord.date >= from_d,
+        MaintenanceRecord.date <= to_d,
+        MaintenanceRecord.cost.isnot(None),
+    )
+    if property_id:
+        q = q.filter(MaintenanceRecord.property_id == property_id)
+    return q
+
+
 def get_pnl(
     db: Session,
-    user_id: uuid.UUID,
+    user: User,
     from_date: date | None = None,
     to_date: date | None = None,
-    property_id: uuid.UUID | None = None,
+    property_id: Any = None,
 ) -> dict[str, Any]:
     """Profit & Loss statement within a date range.
 
     Groups transactions by income/expense category, includes maintenance
-    costs as expenses, and returns net income.
+    costs as expenses, and returns net income. Grouping happens in SQL.
     """
     from_date_parsed, to_date_parsed = _get_date_range(from_date, to_date)
 
-    # Base query — user-scoped through properties
-    base = (
-        db.query(Transaction)
-        .join(Property)
-        .filter(
-            Property.user_id == user_id,
-            Property.archived_at.is_(None),
-            Transaction.transaction_date >= from_date_parsed,
-            Transaction.transaction_date <= to_date_parsed,
+    # SQL GROUP BY (category, type) — bounded result set regardless of
+    # how many transactions exist in the range
+    rows = (
+        _scoped_txn_query(db, user, from_date_parsed, to_date_parsed, property_id)
+        .with_entities(
+            Transaction.category,
+            Transaction.transaction_type,
+            func.sum(Transaction.amount),
         )
+        .group_by(Transaction.category, Transaction.transaction_type)
+        .all()
     )
-    if property_id:
-        base = base.filter(Transaction.property_id == property_id)
 
-    txns = base.order_by(Transaction.transaction_date.desc()).all()
-
-    # Aggregate by category
     income_by_category: dict[str, float] = {}
     expense_by_category: dict[str, float] = {}
     total_income = 0.0
     total_expenses = 0.0
 
-    for txn in txns:
-        cat = (
-            txn.category.value
-            if hasattr(txn.category, "value")
-            else str(txn.category)
-        )
-        amt = float(txn.amount)
-        if txn.transaction_type == TransactionType.INCOME:
-            income_by_category[cat] = income_by_category.get(cat, 0) + amt
-            total_income += amt
+    for cat, ttype, amt in rows:
+        cat_label = cat.value if hasattr(cat, "value") else str(cat)
+        amount = float(amt or 0)
+        if ttype == TransactionType.INCOME:
+            income_by_category[cat_label] = income_by_category.get(cat_label, 0) + amount
+            total_income += amount
         else:
-            expense_by_category[cat] = expense_by_category.get(cat, 0) + amt
-            total_expenses += amt
+            expense_by_category[cat_label] = expense_by_category.get(cat_label, 0) + amount
+            total_expenses += amount
 
-    # Include maintenance costs as expenses within the date range
-    maint_base = (
-        db.query(MaintenanceRecord)
-        .join(Property)
-        .filter(
-            Property.user_id == user_id,
-            Property.archived_at.is_(None),
-            MaintenanceRecord.date >= from_date_parsed,
-            MaintenanceRecord.date <= to_date_parsed,
-            MaintenanceRecord.cost.isnot(None),
-        )
+    # Maintenance costs as expenses within the date range (SQL SUM)
+    total_maintenance_cost = float(
+        _scoped_maint_query(db, user, from_date_parsed, to_date_parsed, property_id)
+        .with_entities(func.coalesce(func.sum(MaintenanceRecord.cost), 0))
+        .scalar()
+        or 0
     )
-    if property_id:
-        maint_base = maint_base.filter(
-            MaintenanceRecord.property_id == property_id
-        )
-
-    total_maintenance_cost = 0.0
-    for rec in maint_base.all():
-        cost = float(rec.cost or 0)
-        total_maintenance_cost += cost
 
     if total_maintenance_cost > 0:
         expense_by_category["Maintenance"] = (
@@ -130,7 +166,12 @@ def get_pnl(
                 expense_by_category.items(), key=lambda x: -x[1]
             )
         ],
-        "transaction_count": len(txns),
+        "transaction_count": (
+            _scoped_txn_query(db, user, from_date_parsed, to_date_parsed, property_id)
+            .with_entities(func.count(Transaction.id))
+            .scalar()
+            or 0
+        ),
         "maintenance_included": round(total_maintenance_cost, 2) > 0,
         "total_maintenance_cost": round(total_maintenance_cost, 2),
     }
@@ -138,42 +179,44 @@ def get_pnl(
 
 def get_cash_flow(
     db: Session,
-    user_id: uuid.UUID,
+    user: User,
     from_date: date | None = None,
-    to_date: str | None = None,
-    property_id: uuid.UUID | None = None,
+    to_date: date | None = None,
+    property_id: Any = None,
 ) -> dict[str, Any]:
     """Monthly cash flow data for charting.
 
     Returns income, expenses, and net per month within the date range.
+    Months are bucketed in SQL (extract works on both SQLite and Postgres).
     """
     from_date_parsed, to_date_parsed = _get_date_range(from_date, to_date)
 
-    base = (
-        db.query(Transaction)
-        .join(Property)
-        .filter(
-            Property.user_id == user_id,
-            Property.archived_at.is_(None),
-            Transaction.transaction_date >= from_date_parsed,
-            Transaction.transaction_date <= to_date_parsed,
+    rows = (
+        _scoped_txn_query(db, user, from_date_parsed, to_date_parsed, property_id)
+        .with_entities(
+            extract("year", Transaction.transaction_date),
+            extract("month", Transaction.transaction_date),
+            Transaction.transaction_type,
+            func.sum(Transaction.amount),
         )
+        .group_by(
+            extract("year", Transaction.transaction_date),
+            extract("month", Transaction.transaction_date),
+            Transaction.transaction_type,
+        )
+        .all()
     )
-    if property_id:
-        base = base.filter(Transaction.property_id == property_id)
-
-    txns = base.all()
 
     # Bucket by year-month
     monthly: dict[str, dict[str, float]] = {}
-    for txn in txns:
-        key = txn.transaction_date.strftime("%Y-%m")
+    for y, m, ttype, amt in rows:
+        key = f"{int(y):04d}-{int(m):02d}"
         entry = monthly.setdefault(key, {"income": 0.0, "expenses": 0.0})
-        amt = float(txn.amount)
-        if txn.transaction_type == TransactionType.INCOME:
-            entry["income"] += amt
+        amount = float(amt or 0)
+        if ttype == TransactionType.INCOME:
+            entry["income"] += amount
         else:
-            entry["expenses"] += amt
+            entry["expenses"] += amount
 
     # Fill in missing months between from/to
     monthly_data: list[dict[str, Any]] = []
@@ -211,8 +254,8 @@ def get_cash_flow(
 
 def get_ytd(
     db: Session,
-    user_id: uuid.UUID,
-    property_id: uuid.UUID | None = None,
+    user: User,
+    property_id: Any = None,
 ) -> dict[str, Any]:
     """Year-to-date summary vs prior year."""
     today = date.today()
@@ -223,27 +266,20 @@ def get_ytd(
     py_end = date(today.year - 1, today.month, today.day)
 
     def _aggregate(from_d: date, to_d: date) -> dict[str, float]:
-        base = (
-            db.query(Transaction)
-            .join(Property)
-            .filter(
-                Property.user_id == user_id,
-                Property.archived_at.is_(None),
-                Transaction.transaction_date >= from_d,
-                Transaction.transaction_date <= to_d,
-            )
+        rows = (
+            _scoped_txn_query(db, user, from_d, to_d, property_id)
+            .with_entities(Transaction.transaction_type, func.sum(Transaction.amount))
+            .group_by(Transaction.transaction_type)
+            .all()
         )
-        if property_id:
-            base = base.filter(Transaction.property_id == property_id)
-
         income = 0.0
         expenses = 0.0
-        for txn in base.all():
-            amt = float(txn.amount)
-            if txn.transaction_type == TransactionType.INCOME:
-                income += amt
+        for ttype, amt in rows:
+            amount = float(amt or 0)
+            if ttype == TransactionType.INCOME:
+                income += amount
             else:
-                expenses += amt
+                expenses += amount
         return {
             "income": round(income, 2),
             "expenses": round(expenses, 2),
@@ -290,34 +326,39 @@ def get_ytd(
 
 def get_annual(
     db: Session,
-    user_id: uuid.UUID,
+    user: User,
     year: int | None = None,
-    property_id: uuid.UUID | None = None,
+    property_id: Any = None,
 ) -> dict[str, Any]:
-    """Full-year monthly P&L breakdown."""
+    """Full-year monthly P&L breakdown (SQL GROUP BY month/category/type)."""
     if year is None:
         year = date.today().year
 
-    base = (
-        db.query(Transaction)
-        .join(Property)
-        .filter(
-            Property.user_id == user_id,
-            Property.archived_at.is_(None),
-            extract("year", Transaction.transaction_date) == year,
+    q = _scoped_txn_query(
+        db, user, date(year, 1, 1), date(year, 12, 31), property_id
+    ).filter(extract("year", Transaction.transaction_date) == year)
+
+    rows = (
+        q.with_entities(
+            extract("month", Transaction.transaction_date),
+            Transaction.category,
+            Transaction.transaction_type,
+            func.sum(Transaction.amount),
+            func.count(Transaction.id),
         )
+        .group_by(
+            extract("month", Transaction.transaction_date),
+            Transaction.category,
+            Transaction.transaction_type,
+        )
+        .all()
     )
-    if property_id:
-        base = base.filter(Transaction.property_id == property_id)
 
-    txns = base.all()
-
-    # Bucket by month
+    # Bucket by month — bounded result set (12 months × categories)
     monthly_raw: dict[int, dict[str, Any]] = {}
-    for txn in txns:
-        m = txn.transaction_date.month
+    for m, cat, ttype, amt, cnt in rows:
         entry = monthly_raw.setdefault(
-            m,
+            int(m),
             {
                 "income": 0.0,
                 "expenses": 0.0,
@@ -326,23 +367,15 @@ def get_annual(
                 "count": 0,
             },
         )
-        cat = (
-            txn.category.value
-            if hasattr(txn.category, "value")
-            else str(txn.category)
-        )
-        amt = float(txn.amount)
-        if txn.transaction_type == TransactionType.INCOME:
-            entry["income"] += amt
-            entry["income_by_category"][cat] = (
-                entry["income_by_category"].get(cat, 0) + amt
-            )
+        cat_label = cat.value if hasattr(cat, "value") else str(cat)
+        amount = float(amt or 0)
+        if ttype == TransactionType.INCOME:
+            entry["income"] += amount
+            entry["income_by_category"][cat_label] = entry["income_by_category"].get(cat_label, 0) + amount
         else:
-            entry["expenses"] += amt
-            entry["expense_by_category"][cat] = (
-                entry["expense_by_category"].get(cat, 0) + amt
-            )
-        entry["count"] += 1
+            entry["expenses"] += amount
+            entry["expense_by_category"][cat_label] = entry["expense_by_category"].get(cat_label, 0) + amount
+        entry["count"] += int(cnt or 0)
 
     month_names = [
         "Jan", "Feb", "Mar", "Apr", "May", "Jun",

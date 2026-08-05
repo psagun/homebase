@@ -67,15 +67,12 @@ def list_tasks(
     tasks = query.options(joinedload(Task.property)).order_by(
         Task.due_date.asc().nullslast(), Task.created_at.desc()
     ).all()
-    changed = False
+    # Status is derived from due_date on read only - never persisted here
+    # (the cron refresher owns status writes). Plain reads must not issue
+    # UPDATEs against the DB.
     for t in tasks:
-        before = t.status
         _refresh_status(t)
-        if t.status != before:
-            changed = True
         t.property_name = t.property.name if t.property else None
-    if changed:
-        db.commit()
     return tasks
 
 
@@ -104,8 +101,7 @@ def get_task(db: Session, user_id, task_id) -> Task:
     task = db.query(Task).filter(Task.id == task_id, Task.user_id == user_id).first()
     if not task:
         raise HTTPException(status_code=status.HTTP_404_NOT_FOUND, detail="Task not found")
-    _refresh_status(task)
-    db.commit()
+    _refresh_status(task)  # in-memory only - no write-on-read
     # Fetch property name from relationship
     if hasattr(task, "property") and task.property:
         task.property_name = task.property.name
