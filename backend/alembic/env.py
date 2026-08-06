@@ -31,18 +31,14 @@ def run_migrations_offline() -> None:
 
 
 def run_migrations_online() -> None:
-    # Allow overriding the DB via DATABASE_URL (prod deploy uses env, not ini)
+    # Build the engine from DATABASE_URL directly when set — avoids
+    # configparser interpolation choking on URL-escaped characters like %40
     import os
 
-    db_url = os.environ.get("DATABASE_URL")
-    if db_url:
-        config.set_main_option("sqlalchemy.url", db_url)
+    from sqlalchemy import create_engine
 
-    connectable = engine_from_config(
-        config.get_section(config.config_ini_section, {}),
-        prefix="sqlalchemy.",
-        poolclass=pool.NullPool,
-    )
+    db_url = os.environ.get("DATABASE_URL") or config.get_main_option("sqlalchemy.url")
+    connectable = create_engine(db_url, poolclass=pool.NullPool)
     with connectable.connect() as connection:
         context.configure(connection=connection, target_metadata=target_metadata)
         with context.begin_transaction():
