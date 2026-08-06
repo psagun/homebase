@@ -324,6 +324,26 @@ def update_investor(
     )
 
 
+@router.post("/set-role")
+def set_user_role(
+    email: str = Query(..., description="Email of the account to update"),
+    role: str = Query(..., description="New role: admin | user | investor"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """TEMP: promote/demote a user's role (one-off, removed after use)."""
+    _require_admin(current_user)
+    if role not in ("admin", "user", "investor"):
+        raise HTTPException(status_code=400, detail="Invalid role")
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    before = user.role
+    user.role = role
+    db.commit()
+    return {"email": user.email, "role_before": before, "role_now": user.role}
+
+
 @router.post("/investors/{investor_id}/reset-password")
 def reset_investor_password(
     investor_id: uuid.UUID,
