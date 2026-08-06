@@ -324,6 +324,156 @@ def update_investor(
     )
 
 
+def _clone_row(model, src, **overrides):
+    """Copy a row's column values into a new instance with a fresh id.
+
+    Enum members, decimals, and dates carry over via the ORM; id and
+    created/updated timestamps are regenerated.
+    """
+    data = {
+        c.name: getattr(src, c.name)
+        for c in model.__table__.columns
+        if c.name not in ("id", "created_at", "updated_at")
+    }
+    data.update(overrides)
+    data["id"] = uuid.uuid4()
+    return model(**data)
+
+
+@router.post("/copy-portfolio")
+def copy_portfolio(
+    target_email: str = Query(..., description="Email of the account receiving the portfolio"),
+    apply: bool = Query(False, description="Apply the copy; default is a dry-run report"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Copy the demo portfolio (6 properties + all records) to another account.
+
+    One-off migration helper. Clones properties, mortgages, insurance,
+    taxes, tenants, maintenance, transactions, tasks, contacts, documents
+    (metadata only) and payment history. Ownership entities are global, so
+    links carry over untouched; investor portal links are NOT copied.
+    Existing properties on the target (same name+address) are skipped.
+    """
+    _require_admin(current_user)
+    from backend.models.contact import Contact, property_contacts
+    from backend.models.document import Document
+    from backend.models.insurance_policy import InsurancePolicy
+    from backend.models.maintenance_record import MaintenanceRecord
+    from backend.models.mortgage import Mortgage
+    from backend.models.payment_history import PaymentHistory
+    from backend.models.property import Property
+    from backend.models.property_tax import PropertyTax
+    from backend.models.task import Task
+    from backend.models.tenant import Tenant
+    from backend.models.transaction import Transaction
+
+    source = db.query(User).filter(User.email == "demo@homebase.app").first()
+    target = db.query(User).filter(User.email == target_email).first()
+    if not source:
+        raise HTTPException(status_code=404, detail="Source account (demo@homebase.app) not found")
+    if not target:
+        raise HTTPException(status_code=404, detail="Target account not found")
+
+    report = {"target": target.email, "dry_run": not apply, "properties": []}
+    existing_names = {
+        (r[0], r[1])
+        for r in db.query(Property.name, Property.address_line_1).filter(
+            Property.user_id == target.id, Property.archived_at.is_(None)
+        ).all()
+    }
+
+    source_props = (
+        db.query(Property)
+        .filter(Property.user_id == source.id, Property.archived_at.is_(None))
+        .order_by(Property.created_at)
+        .all()
+    )
+
+    for sp in source_props:
+        if (sp.name, sp.address_line_1) in existing_names:
+            report["properties"].append({"name": sp.name, "status": "skipped (exists on target)"})
+            continue
+
+        # Plan counts for the dry run
+        plan = {
+            "mortgages": db.query(Mortgage).filter(Mortgage.property_id == sp.id).count(),
+            "insurance": db.query(InsurancePolicy).filter(InsurancePolicy.property_id == sp.id).count(),
+            "taxes": db.query(PropertyTax).filter(PropertyTax.property_id == sp.id).count(),
+            "tenants": db.query(Tenant).filter(Tenant.property_id == sp.id).count(),
+            "maintenance": db.query(MaintenanceRecord).filter(MaintenanceRecord.property_id == sp.id).count(),
+            "transactions": db.query(Transaction).filter(Transaction.property_id == sp.id).count(),
+            "tasks": db.query(Task).filter(Task.property_id == sp.id, Task.user_id == source.id).count(),
+            "payment_history": db.query(PaymentHistory).filter(PaymentHistory.property_id == sp.id).count(),
+            "contacts": db.query(property_contacts).filter(property_contacts.c.property_id == sp.id).count(),
+            "documents": db.query(Document).filter(Document.property_id == sp.id).count(),
+        }
+
+        if not apply:
+            report["properties"].append({"name": sp.name, "status": "would copy", **plan})
+            continue
+
+        # ── Apply: clone the property and everything attached ──
+        np = _clone_row(Property, sp, user_id=target.id)
+        db.add(np)
+        db.flush()
+
+        source_id_map = {}  # (model, old_id) -> new_id for payment_history.source_id
+        for model in (Mortgage, InsurancePolicy, PropertyTax):
+            for row in db.query(model).filter(model.property_id == sp.id).all():
+                clone = _clone_row(model, row, property_id=np.id)
+                db.add(clone)
+                db.flush()
+                source_id_map[(model.__name__, row.id)] = clone.id
+
+        for row in db.query(Tenant).filter(Tenant.property_id == sp.id).all():
+            db.add(_clone_row(Tenant, row, property_id=np.id))
+        for row in db.query(MaintenanceRecord).filter(MaintenanceRecord.property_id == sp.id).all():
+            db.add(_clone_row(MaintenanceRecord, row, property_id=np.id))
+        for row in db.query(Transaction).filter(Transaction.property_id == sp.id).all():
+            db.add(_clone_row(Transaction, row, property_id=np.id, user_id=target.id))
+        for row in db.query(Task).filter(Task.property_id == sp.id, Task.user_id == source.id).all():
+            db.add(_clone_row(Task, row, property_id=np.id, user_id=target.id))
+
+        # Payment history — remap source_id to the cloned mortgage/insurance/tax
+        for row in db.query(PaymentHistory).filter(PaymentHistory.property_id == sp.id).all():
+            model_name = {"mortgage": "Mortgage", "insurance": "InsurancePolicy", "tax": "PropertyTax"}.get(row.payment_type)
+            new_source = source_id_map.get((model_name, row.source_id), row.source_id)
+            db.add(_clone_row(PaymentHistory, row, property_id=np.id, user_id=target.id, source_id=new_source))
+
+        # Contacts — clone once per source contact, then link
+        contact_map = {}
+        link_rows = db.execute(
+            text("SELECT contact_id FROM property_contacts WHERE property_id = :pid"),
+            {"pid": _hex(sp.id)},
+        ).fetchall()
+        for link in link_rows:
+            src_contact = db.query(Contact).filter(Contact.id == uuid.UUID(str(link.contact_id))).first()
+            if not src_contact:
+                continue
+            if src_contact.id not in contact_map:
+                contact_map[src_contact.id] = _clone_row(Contact, src_contact, user_id=target.id)
+                db.add(contact_map[src_contact.id])
+                db.flush()
+            db.execute(
+                text("INSERT INTO property_contacts (property_id, contact_id) VALUES (:pid, :cid)"),
+                {"pid": _hex(np.id), "cid": _hex(contact_map[src_contact.id].id)},
+            )
+
+        # Documents — metadata only (same storage key, files untouched)
+        for row in db.query(Document).filter(Document.property_id == sp.id).all():
+            db.add(_clone_row(Document, row, property_id=np.id, user_id=target.id))
+
+        existing_names.add((sp.name, sp.address_line_1))
+        report["properties"].append({"name": sp.name, "status": "copied", **plan})
+
+    if apply:
+        db.commit()
+
+    report["total"] = len(report["properties"])
+    return {"status": "ok", "report": report}
+
+
 @router.post("/investors/{investor_id}/reset-password")
 def reset_investor_password(
     investor_id: uuid.UUID,
