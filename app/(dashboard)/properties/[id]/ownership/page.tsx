@@ -115,10 +115,10 @@ export default function OwnershipPage({ params }: { params: { id: string } }) {
                   icon: <Pencil className="h-4 w-4" />,
                   onClick: () => {
                     setEditEntityMode(true);
-                    setNewEntityName(ownership!.entity!.name);
-                    setNewEntityType(ownership!.entity!.entity_type || "");
-                    setNewEntityEin(ownership!.entity!.ein || "");
-                    setNewEntityState(ownership!.entity!.state_of_formation || "");
+                    setNewEntityName(ownership?.entity?.name ?? "");
+                    setNewEntityType(ownership?.entity?.entity_type ?? "");
+                    setNewEntityEin(ownership?.entity?.ein ?? "");
+                    setNewEntityState(ownership?.entity?.state_of_formation ?? "");
                   },
                 },
                 { label: "Remove from Property", icon: <X className="h-4 w-4" />, destructive: true, onClick: handleRemoveEntity },

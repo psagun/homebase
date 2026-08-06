@@ -1,6 +1,6 @@
 "use client";
 import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
-import { listTransactions, getCashFlow, createTransaction, deleteTransaction, type TransactionCreateData } from "@/lib/api/transactions";
+import { listTransactions, getCashFlow, createTransaction, deleteTransaction, updateTransaction, type TransactionCreateData } from "@/lib/api/transactions";
 
 export function useTransactions(propertyId: string) {
   return useQuery({ queryKey: ["transactions", propertyId], queryFn: () => listTransactions(propertyId), enabled: !!propertyId });
@@ -29,11 +29,10 @@ export function useDeleteTransaction(propertyId: string) {
 export function useUpdateTransaction(propertyId: string) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, data }: { id: string; data: Partial<import("@/lib/api/transactions").TransactionCreateData> }) =>
-      import("@/lib/api/transactions").then((m) => m.updateTransaction(id, data)),
+    mutationFn: ({ id, data }: { id: string; data: Partial<TransactionCreateData> }) => updateTransaction(id, data),
     onSuccess: () => {
       qc.invalidateQueries({ queryKey: ["transactions", propertyId] });
-      qc.invalidateQueries({ queryKey: ["cash-flow", propertyId] });
+      qc.invalidateQueries({ queryKey: ["transactions", propertyId, "cashflow"] });
     },
   });
 }

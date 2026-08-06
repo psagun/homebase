@@ -1,14 +1,15 @@
 "use client";
 
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import Link from "next/link";
 import { DollarSign, CalendarCheck, FileText, ShieldCheck, Wrench, Plus, Landmark, ExternalLink, Building2, Receipt } from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
+import { useTasks } from "@/lib/hooks/useTasks";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
 import { PayPortalButton } from "@/components/shared/PayPortalButton";
-import { formatCurrency } from "@/lib/utils";
+import { formatCurrency, formatDate } from "@/lib/utils";
 
 interface ReminderItem {
   id: string;
@@ -45,34 +46,39 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
   const [paymentLinks, setPaymentLinks] = useState<{ label: string; url: string; icon: React.ReactNode; type: "mortgage" | "insurance" | "tax"; id: string; dueDate?: string | null }[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [remindersLoading, setRemindersLoading] = useState(true);
+  const [summaryData, setSummaryData] = useState<{ mortgage: any; insurance: any; taxes: any[]; tenants: any[] }>({
+    mortgage: null, insurance: null, taxes: [], tenants: [],
+  });
 
-  // Load this property's active tasks for the reminders section
+  // Load this property's active tasks for the reminders section (React Query)
+  const { data: tasksData, isLoading: tasksLoading } = useTasks({ property_id: id });
   useEffect(() => {
-    fetch(`/api/v1/tasks?property_id=${id}`, { credentials: "include" })
-      .then((r) => r.json())
-      .then((data: ReminderItem[]) => {
-        const active = (Array.isArray(data) ? data : []).filter(
-          (t) => t.status !== "Completed" && t.status !== "Dismissed"
-        );
-        // Sort: overdue first, then due today, then by due date
-        active.sort((a, b) => {
-          const rank = (t: ReminderItem) =>
-            t.status === "Overdue" ? 0 : t.status === "Due Today" ? 1 : 2;
-          if (rank(a) !== rank(b)) return rank(a) - rank(b);
-          return (a.due_date || "").localeCompare(b.due_date || "");
-        });
-        setReminders(active.slice(0, 5));
-      })
-      .catch(() => {})
-      .finally(() => setRemindersLoading(false));
-  }, [id]);
+    const active = (Array.isArray(tasksData) ? tasksData : []).filter(
+      (t) => t.status !== "Completed" && t.status !== "Dismissed"
+    );
+    // Sort: overdue first, then due today, then by due date
+    active.sort((a, b) => {
+      const rank = (t: ReminderItem) =>
+        t.status === "Overdue" ? 0 : t.status === "Due Today" ? 1 : 2;
+      if (rank(a) !== rank(b)) return rank(a) - rank(b);
+      return (a.due_date || "").localeCompare(b.due_date || "");
+    });
+    setReminders(active.slice(0, 5));
+    setRemindersLoading(tasksLoading);
+  }, [tasksData, tasksLoading]);
 
   useEffect(() => {
     Promise.all([
       fetch(`/api/v1/properties/${id}/mortgage`, { credentials: "include" }).then(r => r.json()).catch(() => null),
       fetch(`/api/v1/properties/${id}/insurance`, { credentials: "include" }).then(r => r.json()).catch(() => null),
       fetch(`/api/v1/properties/${id}/taxes`, { credentials: "include" }).then(r => r.json()).catch(() => null),
-    ]).then(([mortgage, insurance, taxes]) => {
+      fetch(`/api/v1/properties/${id}/tenants`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+    ]).then(([mortgage, insurance, taxes, tenants]) => {
+      setSummaryData({
+        mortgage, insurance,
+        taxes: Array.isArray(taxes) ? taxes : [],
+        tenants: Array.isArray(tenants) ? tenants : [],
+      });
       const links: { label: string; url: string; icon: React.ReactNode; type: "mortgage" | "insurance" | "tax"; id: string; dueDate?: string | null }[] = [];
       if (mortgage?.portal_url) links.push({
         label: "Pay Mortgage", url: mortgage.portal_url, icon: <Landmark className="h-4 w-4" />,
@@ -143,32 +149,32 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
             icon={<DollarSign className="h-5 w-5" />}
             iconBg="bg-emerald-100 text-emerald-600"
             title="Monthly Rent"
-            value="$0"
-            subtitle="No tenant data yet"
+            value={formatCurrency(summaryData.tenants.reduce((s: number, t: any) => s + Number(t.monthly_rent || 0), 0))}
+            subtitle={summaryData.tenants.length ? `${summaryData.tenants.length} tenant${summaryData.tenants.length === 1 ? "" : "s"}` : "No tenant data yet"}
             href={`/properties/${id}/tenants`}
           />
           <SummaryCard
             icon={<Landmark className="h-5 w-5" />}
             iconBg="bg-blue-100 text-blue-600"
             title="Mortgage Payment"
-            value="$0"
-            subtitle="Not set up"
+            value={summaryData.mortgage?.monthly_payment ? formatCurrency(Number(summaryData.mortgage.monthly_payment)) : "—"}
+            subtitle={summaryData.mortgage?.next_due_date ? `Next due ${formatDate(summaryData.mortgage.next_due_date)}` : "Not set up"}
             href={`/properties/${id}/mortgage`}
           />
           <SummaryCard
             icon={<ShieldCheck className="h-5 w-5" />}
             iconBg="bg-purple-100 text-purple-600"
             title="Insurance Renewal"
-            value="—"
-            subtitle="Not set up"
+            value={summaryData.insurance?.annual_premium ? formatCurrency(Number(summaryData.insurance.annual_premium)) : "—"}
+            subtitle={summaryData.insurance?.renewal_date ? `Renews ${formatDate(summaryData.insurance.renewal_date)}` : "Not set up"}
             href={`/properties/${id}/insurance`}
           />
           <SummaryCard
             icon={<FileText className="h-5 w-5" />}
             iconBg="bg-amber-100 text-amber-600"
             title="Property Tax"
-            value="—"
-            subtitle="Not set up"
+            value={summaryData.taxes[0]?.annual_tax ? formatCurrency(Number(summaryData.taxes[0].annual_tax)) : "—"}
+            subtitle={summaryData.taxes[0]?.next_due_date ? `Next due ${formatDate(summaryData.taxes[0].next_due_date)}` : "Not set up"}
             href={`/properties/${id}/taxes`}
           />
         </div>

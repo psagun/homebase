@@ -24,6 +24,10 @@ class ChangePasswordRequest(BaseModel):
     current_password: str = Field(..., min_length=1)
     new_password: str = Field(..., min_length=8, max_length=128)
 
+
+class ProfileUpdateRequest(BaseModel):
+    name: str | None = Field(None, min_length=1, max_length=200)
+
 router = APIRouter()
 
 
@@ -175,6 +179,20 @@ def refresh(
 @router.get("/me", response_model=UserResponse)
 def get_me(current_user: User = Depends(get_current_user)):
     """Return the currently authenticated user."""
+    return current_user
+
+
+@router.patch("/me", response_model=UserResponse)
+def update_me(
+    data: ProfileUpdateRequest,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Update the authenticated user's profile."""
+    if data.name is not None:
+        current_user.name = data.name
+    db.commit()
+    db.refresh(current_user)
     return current_user
 
 

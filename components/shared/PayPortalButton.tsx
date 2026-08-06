@@ -30,7 +30,7 @@ export function PayPortalButton({ paymentType, sourceId, url, dueDate, label }: 
       target="_blank"
       rel="noopener noreferrer"
       onClick={() => markPending(dueDate || undefined)}
-      className="inline-flex items-center gap-2 rounded-md bg-[#00D632] px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-[#00b82a] hover:shadow-md transition-all"
+      className="inline-flex items-center gap-2 rounded-md bg-emerald-600 px-4 py-2 text-sm font-bold text-white shadow-sm hover:bg-emerald-700 hover:shadow-md transition-all"
     >
       <ExternalLink className="h-4 w-4" />
       {label || "Pay Now"}

@@ -281,7 +281,7 @@ function CashFlowTab({
             );
           })}
           <line x1={0} y1={chartHeight - 25} x2={Math.max(data.monthly.length * 80, 200)} y2={chartHeight - 25}
-            stroke="#e8eaed" strokeWidth={1} />
+            stroke="hsl(var(--border))" strokeWidth={1} />
         </svg>
         <div className="flex items-center justify-center gap-6 mt-3">
           <div className="flex items-center gap-2 text-xs text-muted-foreground">
@@ -584,7 +584,7 @@ function SparklineChart({ data }: { data: { label: string; net: number }[] }) {
 
   return (
     <svg width="100%" height={height} viewBox={`0 0 ${width} ${height}`} className="overflow-visible">
-      <line x1={0} y1={midY} x2={width} y2={midY} stroke="#e8eaed" strokeWidth={1} strokeDasharray="4 2" />
+      <line x1={0} y1={midY} x2={width} y2={midY} stroke="hsl(var(--border))" strokeWidth={1} strokeDasharray="4 2" />
       {data.map((m, i) => {
         const x = i * 60 + barPadding;
         const barH = Math.max(Math.abs((m.net / maxVal) * (height / 2 - 10)), 0);

@@ -4,6 +4,7 @@ import Link from "next/link";
 import { useDashboardSummary, useDashboardProperties } from "@/lib/hooks/useDashboard";
 import { useRecentlyViewed } from "@/lib/hooks/useRecentlyViewed";
 import { usePaymentHistory } from "@/lib/hooks/usePayments";
+import { useCashFlow } from "@/lib/hooks/useReports";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -26,6 +27,7 @@ export default function DashboardPage() {
   const { data: properties, isLoading: propsLoading, isError: propsError, refetch: refetchProps } = useDashboardProperties();
   const { properties: recentViewed, isLoading: recentLoading } = useRecentlyViewed();
   const { data: payments } = usePaymentHistory();
+  const { data: cashflow } = useCashFlow();
 
   if (statsLoading || propsLoading) return <LoadingState text="Loading portfolio data..." />;
   if (statsError || propsError) return (
@@ -76,7 +78,7 @@ export default function DashboardPage() {
         <SumCard icon={<Home className="h-4 w-4" />} bg="#eef2ff" color="#3b82f6" label="Total Properties" value={String(stats.total_properties)} sub={`${stats.occupancy_rate}% occupied`} subColor="#10b981" />
         <SumCard icon={<DollarSign className="h-4 w-4" />} bg="#ecfdf5" color="#10b981" label="Total Value" value={formatCurrency(stats.total_value)} sub={`${stats.value_change_percentage >= 0 ? "+" : ""}${stats.value_change_percentage}%`} subColor="#10b981" />
         <SumCard icon={<TrendingUp className="h-4 w-4" />} bg="#faf5ff" color="#8b5cf6" label="Total Equity" value={formatCurrency(stats.total_equity)} sub={`${stats.total_equity >= 0 ? "+" : "-"}$${Math.abs(stats.total_equity).toLocaleString()}`} subColor="#10b981" />
-        <SumCard icon={<Receipt className="h-4 w-4" />} bg="#fff7ed" color="#f97316" label="Monthly Rent" value={hasTransactions ? formatCurrency(stats.total_monthly_income) : "—"} sub={hasTransactions ? "+12% from last month" : "No data yet"} subColor={hasTransactions ? "#10b981" : "#8b8fa3"} />
+        <SumCard icon={<Receipt className="h-4 w-4" />} bg="#fff7ed" color="#f97316" label="Monthly Rent" value={hasTransactions ? formatCurrency(stats.total_monthly_income) : "—"} sub={hasTransactions ? "Real income, all properties" : "No data yet"} subColor={hasTransactions ? "#10b981" : "#8b8fa3"} />
         <SumCard icon={<TrendingUp className="h-4 w-4" />} bg="#eef2ff" color="#3b82f6" label="Cash Flow (MTD)" value={hasTransactions ? formatCurrency(stats.net_monthly_income) : "—"} sub={hasTransactions ? "Track your income" : "Add transactions"} subColor="#8b8fa3" />
       </div>
 
@@ -89,12 +91,12 @@ export default function DashboardPage() {
             <h2 className="text-sm font-semibold text-foreground">Upcoming Reminders</h2>
             <Link href="/tasks" className="text-xs text-primary font-medium hover:underline">View all</Link>
           </div>
-          <div className="divide-y divide-[#e8eaed]">
+          <div className="divide-y divide-border">
             {stats.reminders && stats.reminders.length > 0 ? (
               stats.reminders.slice(0, 5).map((r: any) => {
                 const dd = r.due_date ? new Date(r.due_date) : null;
                 const td = new Date(); td.setHours(0, 0, 0, 0);
-                let rel = "", diff = 0;
+                let rel = "—", diff = 0;
                 if (dd) { diff = Math.ceil((dd.getTime() - td.getTime()) / 86400000); if (diff < 0) rel = `Overdue by ${Math.abs(diff)}d`; else if (diff === 0) rel = "Due today"; else rel = `Due in ${diff}d`; }
                 const relCls = diff < 0 ? "text-red-500" : diff === 0 ? "text-amber-600" : diff <= 3 ? "text-orange-500" : diff <= 7 ? "text-blue-500" : "text-gray-400";
                 const { Icon, bg, color } = getRI(r.task_type, r.status);
@@ -128,15 +130,27 @@ export default function DashboardPage() {
             <>
               <p className="text-3xl font-bold text-foreground">{formatCurrency(stats.net_monthly_income)}</p>
               <p className="text-xs text-muted-foreground mt-0.5 mb-3">Net cash flow across all properties</p>
-              <div className="flex-1 min-h-[120px]">
-                <svg viewBox="0 0 320 110" className="w-full h-full overflow-visible" preserveAspectRatio="xMidYMid meet">
-                  <defs><linearGradient id="g" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#3b82f6" stopOpacity={0.2} /><stop offset="100%" stopColor="#3b82f6" stopOpacity={0.01} /></linearGradient></defs>
-                  {[85, 60, 35, 10].map((y, i) => (<g key={y}><line x1="0" y1={y} x2="310" y2={y} stroke="#e8eaed" strokeWidth="0.5" /><text x="-4" y={y+2} textAnchor="end" className="text-[7px]" fill="#8b8fa3">{["$15k","$10k","$5k","$0"][i]}</text></g>))}
-                  <polygon points="0,90 10,75 50,55 90,65 130,40 170,45 210,27 250,37 290,19 310,23 310,110 0,110" fill="url(#g)" />
-                  <polyline points="10,75 50,55 90,65 130,40 170,45 210,27 250,37 290,19 310,23" fill="none" stroke="#3b82f6" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
-                  {[[10,75],[50,55],[90,65],[130,40],[170,45],[210,27],[250,37],[290,19],[310,23]].map(([x,y],i) => <circle key={i} cx={x} cy={y} r="2" fill="white" stroke="#3b82f6" strokeWidth="1.2" />)}
-                  {["Jun 1","Jun 8","Jun 15","Jun 22","Jun 29"].map((l,i) => <text key={i} x={30+i*70} y="106" textAnchor="middle" className="text-[7px]" fill="#8b8fa3">{l}</text>)}
-                </svg>
+              <div className="flex-1 min-h-[120px] flex items-end gap-1.5">
+                {(() => {
+                  const monthly = (cashflow?.monthly || []).slice(-6);
+                  const max = Math.max(...monthly.map((m: any) => Math.abs(m.net || 0)), 1);
+                  return monthly.length ? monthly.map((m: any) => {
+                    const net = m.net ?? 0;
+                    const h = Math.max(4, (Math.abs(net) / max) * 100);
+                    return (
+                      <div key={m.month} className="flex-1 flex flex-col items-center gap-1 min-w-0">
+                        <div
+                          className={`w-full rounded-t ${net >= 0 ? "bg-emerald-500/70" : "bg-red-500/70"}`}
+                          style={{ height: `${h}px` }}
+                          title={`${m.label}: ${formatCurrency(net)}`}
+                        />
+                        <span className="text-[9px] text-muted-foreground truncate w-full text-center">{m.label}</span>
+                      </div>
+                    );
+                  }) : (
+                    <p className="text-xs text-muted-foreground self-center w-full text-center">No monthly data yet</p>
+                  );
+                })()}
               </div>
             </>
           ) : (
@@ -155,7 +169,7 @@ export default function DashboardPage() {
             <div className="flex items-center gap-5 flex-1">
               <div className="w-[120px] h-[120px] shrink-0">
                 <svg viewBox="0 0 36 36" className="w-full h-full -rotate-90">
-                  <circle r="13" cx="18" cy="18" fill="none" stroke="#e8eaed" strokeWidth="6" />
+                  <circle r="13" cx="18" cy="18" fill="none" stroke="hsl(var(--border))" strokeWidth="6" />
                   {(() => { let o = 0; return stats.properties_by_status.map((item: any) => { const p = item.count / total; const c = 2*Math.PI*13; const l = c*p; const e = <circle key={item.status} r="13" cx="18" cy="18" fill="none" stroke={STATUS_COLORS[item.status]||"#6b7280"} strokeWidth="6" strokeDasharray={`${l} ${c-l}`} strokeDashoffset={-o} />; o += l; return e; }); })()}
                 </svg>
               </div>
@@ -179,7 +193,7 @@ export default function DashboardPage() {
             <h2 className="text-sm font-semibold text-foreground">Recent Payments</h2>
             <span className="text-xs text-muted-foreground">Confirmed by you</span>
           </div>
-          <div className="divide-y divide-[#e8eaed]">
+          <div className="divide-y divide-border">
             {payments && payments.length > 0 ? (
               payments.slice(0, 5).map((p: any) => {
                 const { Icon, bg, color } = getPayIcon(p.payment_type);
