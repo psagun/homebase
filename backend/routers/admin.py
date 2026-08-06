@@ -324,6 +324,45 @@ def update_investor(
     )
 
 
+@router.post("/clear-transactions")
+def clear_user_transactions(
+    email: str = Query(..., description="Email of the account"),
+    apply: bool = Query(False, description="Delete; default is an inspection report"),
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """TEMP: inspect and delete a user's transactions (one-off)."""
+    _require_admin(current_user)
+    from backend.models.transaction import Transaction as Txn
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        raise HTTPException(status_code=404, detail="User not found")
+    rows = (
+        db.query(Txn)
+        .filter(Txn.user_id == user.id)
+        .order_by(Txn.transaction_date.desc().nullslast())
+        .all()
+    )
+    sample = [
+        {
+            "id": str(t.id),
+            "category": getattr(t.category, "value", None) or str(t.category),
+            "transaction_type": getattr(t.transaction_type, "value", None) or str(t.transaction_type),
+            "transaction_date": str(t.transaction_date) if t.transaction_date else None,
+            "amount": float(t.amount or 0),
+            "description": t.description,
+        }
+        for t in rows[:25]
+    ]
+    report = {"email": email, "count": len(rows), "sample": sample, "dry_run": not apply}
+    if apply and rows:
+        db.query(Txn).filter(Txn.user_id == user.id).delete()
+        db.commit()
+        report["deleted"] = len(rows)
+    return {"status": "ok", "report": report}
+
+
 @router.post("/investors/{investor_id}/reset-password")
 def reset_investor_password(
     investor_id: uuid.UUID,
