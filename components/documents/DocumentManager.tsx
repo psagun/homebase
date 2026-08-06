@@ -4,7 +4,8 @@ import { useEffect, useRef, useState } from "react";
 import {
   Upload, Trash2, FileText, Download, Pencil, Eye, RefreshCw, X, Check,
 } from "lucide-react";
-import { listDocuments, uploadDocument, deleteDocument, renameDocument, replaceDocument, previewDocument } from "@/lib/api/documents";
+import { uploadDocument, deleteDocument, renameDocument, replaceDocument, previewDocument } from "@/lib/api/documents";
+import { useDocuments } from "@/lib/hooks/useDocuments";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { EmptyState } from "@/components/shared/EmptyState";
@@ -39,9 +40,7 @@ const categoryIcons: Record<string, string> = {
 export function DocumentManager({ propertyId, categories, uploadLabel = "Upload Document" }: DocumentManagerProps) {
   const cats = categories && categories.length > 0 ? categories : DEFAULT_CATEGORIES;
   const [category, setCategory] = useState("");
-  const [docs, setDocs] = useState<DocumentData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: docs, isLoading: loading, isError: error, refetch } = useDocuments(propertyId, category);
   const [uploading, setUploading] = useState(false);
   const [uploadPct, setUploadPct] = useState(0);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
@@ -49,22 +48,6 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
   const [renameValue, setRenameValue] = useState("");
   const [preview, setPreview] = useState<{ url: string; name: string; file_type: string; id: string } | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
-
-  const load = async () => {
-    try {
-      const data = await listDocuments(propertyId, category || undefined);
-      setDocs(data);
-    } catch {
-      setError(true);
-    } finally {
-      setLoading(false);
-    }
-  };
-
-  useEffect(() => {
-    setLoading(true);
-    load();
-  }, [propertyId, category]);
 
   const flash = (text: string, ok = true) => {
     setMsg({ text, ok });
@@ -81,7 +64,7 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
     try {
       await uploadDocument(propertyId, file, category || "Other");
       flash("Document uploaded");
-      await load();
+      await refetch();
     } catch {
       flash("Upload failed", false);
     }
@@ -102,7 +85,7 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
       await renameDocument(id, renameValue.trim());
       flash("Document renamed");
       setRenamingId(null);
-      await load();
+      await refetch();
     } catch {
       flash("Rename failed", false);
     }
@@ -118,7 +101,7 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
       try {
         await replaceDocument(doc.id, file);
         flash("Document replaced");
-        await load();
+        await refetch();
       } catch {
         flash("Replace failed", false);
       }
@@ -136,7 +119,7 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
   };
 
   if (loading) return <LoadingState text="Loading documents..." />;
-  if (error) return <ErrorState title="Failed to load documents" onRetry={() => { setError(false); setLoading(true); load(); }} />;
+  if (error) return <ErrorState title="Failed to load documents" onRetry={() => refetch()} />;
 
   return (
     <div className="space-y-4">
@@ -170,12 +153,12 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
       )}
 
       {/* Documents list */}
-      {docs.length === 0 ? (
+      {(docs || []).length === 0 ? (
         <EmptyState icon={<FileText className="h-16 w-16" />} title="No documents"
           description="Upload documents to keep them organized with this property." />
       ) : (
         <div className="rounded-lg border bg-card">
-          {docs.map((doc) => (
+          {(docs || []).map((doc) => (
             <div key={doc.id} className="group flex items-center justify-between px-4 py-3 border-b last:border-0 hover:bg-muted/30">
               {/* Rename inline */}
               {renamingId === doc.id ? (
@@ -225,7 +208,7 @@ export function DocumentManager({ propertyId, categories, uploadLabel = "Upload 
                         try {
                           await deleteDocument(doc.id);
                           flash("Document deleted");
-                          await load();
+                          await refetch();
                         } catch {
                           flash("Delete failed", false);
                         }

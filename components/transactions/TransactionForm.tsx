@@ -2,7 +2,7 @@
 
 import { useState, useEffect, type FormEvent } from "react";
 import { TRANSACTION_CATEGORIES } from "@/lib/constants";
-import { updateTransaction, type TransactionCreateData, type TransactionData } from "@/lib/api/transactions";
+import { createTransaction, updateTransaction, type TransactionCreateData, type TransactionData } from "@/lib/api/transactions";
 
 interface Props {
   propertyId: string;
@@ -38,19 +38,9 @@ export function TransactionForm({ propertyId, onSuccess, initialData, onCancelEd
         transaction_date: date, description: description.trim() || undefined,
       };
       if (initialData) {
-        const res = await fetch(`/api/v1/transactions/${initialData.id}`, {
-          method: "PATCH", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!res.ok) throw new Error("Failed to update");
+        await updateTransaction(initialData.id, payload);
       } else {
-        const res = await fetch(`/api/v1/properties/${propertyId}/transactions`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload as TransactionCreateData),
-        });
-        if (!res.ok) throw new Error("Failed to save");
+        await createTransaction(propertyId, payload);
       }
       setAmount(""); setDescription(""); onSuccess();
     } catch (err: unknown) {

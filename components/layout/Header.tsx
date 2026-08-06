@@ -6,6 +6,7 @@ import { usePathname } from "next/navigation";
 import { useTheme } from "next-themes";
 import { Search, Bell, Plus, Menu, AlertTriangle, Clock, Info, X, Sun, Moon } from "lucide-react";
 import { capitalize } from "@/lib/utils";
+import { useNotifications, useMarkNotificationsRead } from "@/lib/hooks/useNotifications";
 
 type Notification = {
   id: string; title: string; type: string; severity: string;
@@ -30,16 +31,11 @@ export function Header({ onMenuClick }: HeaderProps) {
       ? capitalize(raw.replace(/-/g, " "))
       : "Dashboard";
   const [notifOpen, setNotifOpen] = useState(false);
-  const [notifications, setNotifications] = useState<Notification[]>([]);
-  const [unreadCount, setUnreadCount] = useState(0);
+  const { data: notifData } = useNotifications();
+  const markRead = useMarkNotificationsRead();
+  const notifications = notifData?.notifications || [];
+  const unreadCount = notifData?.unreadCount || 0;
   const dropdownRef = useRef<HTMLDivElement>(null);
-
-  useEffect(() => {
-    fetch("/api/v1/notifications/", { credentials: "include" })
-      .then(r => r.json())
-      .then(d => { setNotifications(d.notifications || []); setUnreadCount(d.unread_count || 0); })
-      .catch(() => {});
-  }, []);
 
   useEffect(() => {
     const handleClick = (e: MouseEvent) => {
@@ -73,15 +69,13 @@ export function Header({ onMenuClick }: HeaderProps) {
       <div className="flex items-center gap-1.5 md:gap-3 shrink-0">
         {/* Notification Bell */}
         <div className="relative" ref={dropdownRef}>
-          <button onClick={() => {
-            setNotifOpen(!notifOpen);
-            if (!notifOpen) {
-              fetch("/api/v1/notifications/read", { method: "POST", credentials: "include" })
-                .then(r => r.json())
-                .then(() => setUnreadCount(0))
-                .catch(() => {});
-            }
-          }} className="relative rounded-md border p-2 text-muted-foreground hover:bg-muted transition-colors">
+          <button
+            aria-label="Notifications"
+            onClick={() => {
+              setNotifOpen(!notifOpen);
+              if (!notifOpen) markRead.mutate();
+            }}
+            className="relative rounded-md border p-2 text-muted-foreground hover:bg-muted transition-colors">
             <Bell className="h-4 w-4" />
             {unreadCount > 0 && (
               <span className="absolute -top-1.5 -right-1.5 flex h-5 min-w-[20px] items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white">

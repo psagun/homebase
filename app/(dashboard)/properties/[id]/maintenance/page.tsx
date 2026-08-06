@@ -2,26 +2,12 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Wrench, Calendar, DollarSign, ShieldCheck, X, Check, Clock } from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
+import { useMaintenance } from "@/lib/hooks/useMaintenance";
+import { createMaintenance, updateMaintenance, deleteMaintenance, type MaintenanceData } from "@/lib/api/maintenance";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { formatCurrency } from "@/lib/utils";
-
-interface MaintenanceData {
-  id: string;
-  title: string;
-  description?: string;
-  category?: string;
-  priority?: string;
-  status?: string;
-  date?: string;
-  scheduled_date?: string;
-  completed_date?: string;
-  cost?: number;
-  contractor?: string;
-  notes?: string;
-  warranty_expiration?: string;
-}
 
 const EMPTY_FORM = {
   title: "", description: "", category: "", priority: "Medium", status: "Open",
@@ -38,24 +24,12 @@ const STATUS_COLORS: Record<string, string> = {
 export default function MaintenancePage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property } = useProperty(id);
-  const [records, setRecords] = useState<MaintenanceData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: records, isLoading, isError, refetch } = useMaintenance(id);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  const load = async () => {
-    const r = await fetch(`/api/v1/properties/${id}/maintenance`, { credentials: "include" });
-    if (!r.ok) throw new Error("load failed");
-    setRecords(await r.json());
-  };
-
-  useEffect(() => {
-    load().catch(() => setError(true)).finally(() => setLoading(false));
-  }, [id]);
 
   const resetForm = () => { setForm({ ...EMPTY_FORM }); setEditId(null); setShowForm(false); };
 
@@ -78,21 +52,11 @@ export default function MaintenancePage({ params }: { params: { id: string } }) 
     try {
       const payload = { ...form, title: form.title.trim(), cost: Number(form.cost) || 0 };
       if (editId) {
-        const r = await fetch(`/api/v1/properties/${id}/maintenance/${editId}`, {
-          method: "PATCH", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error("update failed");
+        await updateMaintenance(id, editId, payload);
       } else {
-        const r = await fetch(`/api/v1/properties/${id}/maintenance`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error("create failed");
+        await createMaintenance(id, payload);
       }
-      await load();
+      await refetch();
       resetForm();
       setMsg({ text: editId ? "Record updated" : "Record added", ok: true });
       setTimeout(() => setMsg(null), 2500);
@@ -104,11 +68,8 @@ export default function MaintenancePage({ params }: { params: { id: string } }) 
 
   const handleDelete = async (r: MaintenanceData) => {
     try {
-      const resp = await fetch(`/api/v1/properties/${id}/maintenance/${r.id}`, {
-        method: "DELETE", credentials: "include",
-      });
-      if (!resp.ok) throw new Error("delete failed");
-      await load();
+      await deleteMaintenance(id, r.id);
+      await refetch();
       setMsg({ text: "Record deleted", ok: true });
       setTimeout(() => setMsg(null), 2500);
     } catch {
@@ -116,8 +77,8 @@ export default function MaintenancePage({ params }: { params: { id: string } }) 
     }
   };
 
-  if (loading) return <LoadingState text="Loading maintenance records..." />;
-  if (error) return <ErrorState title="Failed to load" onRetry={() => { setError(false); setLoading(true); load().catch(() => setError(true)).finally(() => setLoading(false)); }} />;
+  if (isLoading) return <LoadingState text="Loading maintenance records..." />;
+  if (isError) return <ErrorState title="Failed to load" onRetry={() => refetch()} />;
 
   return (
     <div className="space-y-6">
@@ -125,7 +86,7 @@ export default function MaintenancePage({ params }: { params: { id: string } }) 
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Maintenance{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{records.length} record{records.length !== 1 ? "s" : ""}</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{(records || []).length} record{(records || []).length !== 1 ? "s" : ""}</p>
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
@@ -241,7 +202,7 @@ export default function MaintenancePage({ params }: { params: { id: string } }) 
       )}
 
       {/* Records */}
-      {records.length === 0 && !showForm ? (
+      {(records || []).length === 0 && !showForm ? (
         <div className="rounded-lg border bg-card py-14 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Wrench className="h-7 w-7 text-muted-foreground" />
@@ -257,7 +218,7 @@ export default function MaintenancePage({ params }: { params: { id: string } }) 
         </div>
       ) : (
         <div className="space-y-3">
-          {records.map((r) => (
+          {(records || []).map((r) => (
             <div key={r.id} className="group rounded-lg border bg-card overflow-hidden">
               <div className="flex items-start justify-between px-4 py-3 border-b bg-muted/30">
                 <div className="flex items-center gap-2 min-w-0">

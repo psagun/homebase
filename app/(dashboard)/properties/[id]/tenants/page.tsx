@@ -2,22 +2,12 @@
 import { useEffect, useState } from "react";
 import { Plus, Pencil, Trash2, Phone, Mail, Calendar, X, Check, Users, KeyRound } from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
+import { useTenants } from "@/lib/hooks/useTenants";
+import { createTenant, updateTenant, deleteTenant, type TenantData } from "@/lib/api/tenants";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { formatCurrency } from "@/lib/utils";
-
-interface TenantData {
-  id: string;
-  name: string;
-  email?: string;
-  phone?: string;
-  move_in_date?: string;
-  lease_start?: string;
-  lease_end?: string;
-  monthly_rent?: number;
-  security_deposit?: number;
-}
 
 const EMPTY_FORM = {
   name: "", email: "", phone: "", monthly_rent: "",
@@ -27,24 +17,12 @@ const EMPTY_FORM = {
 export default function TenantsPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property } = useProperty(id);
-  const [tenants, setTenants] = useState<TenantData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: tenants, isLoading, isError, refetch } = useTenants(id);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  const load = async () => {
-    const r = await fetch(`/api/v1/properties/${id}/tenants`, { credentials: "include" });
-    if (!r.ok) throw new Error("load failed");
-    setTenants(await r.json());
-  };
-
-  useEffect(() => {
-    load().catch(() => setError(true)).finally(() => setLoading(false));
-  }, [id]);
 
   const resetForm = () => { setForm({ ...EMPTY_FORM }); setEditId(null); setShowForm(false); };
 
@@ -70,17 +48,12 @@ export default function TenantsPage({ params }: { params: { id: string } }) {
         monthly_rent: Number(form.monthly_rent) || 0,
         security_deposit: Number(form.security_deposit) || 0,
       };
-      const url = editId
-        ? `/api/v1/properties/${id}/tenants/${editId}`
-        : `/api/v1/properties/${id}/tenants`;
-      const r = await fetch(url, {
-        method: editId ? "PATCH" : "POST",
-        credentials: "include",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify(payload),
-      });
-      if (!r.ok) throw new Error("save failed");
-      await load();
+      if (editId) {
+        await updateTenant(id, editId, payload);
+      } else {
+        await createTenant(id, payload);
+      }
+      await refetch();
       resetForm();
       setMsg({ text: editId ? "Tenant updated" : "Tenant added", ok: true });
       setTimeout(() => setMsg(null), 2500);
@@ -92,11 +65,8 @@ export default function TenantsPage({ params }: { params: { id: string } }) {
 
   const handleDelete = async (t: TenantData) => {
     try {
-      const r = await fetch(`/api/v1/properties/${id}/tenants/${t.id}`, {
-        method: "DELETE", credentials: "include",
-      });
-      if (!r.ok) throw new Error("delete failed");
-      await load();
+      await deleteTenant(id, t.id);
+      await refetch();
       setMsg({ text: "Tenant removed", ok: true });
       setTimeout(() => setMsg(null), 2500);
     } catch {
@@ -104,10 +74,10 @@ export default function TenantsPage({ params }: { params: { id: string } }) {
     }
   };
 
-  if (loading) return <LoadingState text="Loading tenants..." />;
-  if (error) return <ErrorState title="Failed to load" onRetry={() => { setError(false); setLoading(true); load().catch(() => setError(true)).finally(() => setLoading(false)); }} />;
+  if (isLoading) return <LoadingState text="Loading tenants..." />;
+  if (isError) return <ErrorState title="Failed to load" onRetry={() => refetch()} />;
 
-  const totalRent = tenants.reduce((s, t) => s + (Number(t.monthly_rent) || 0), 0);
+  const totalRent = (tenants || []).reduce((s, t) => s + (Number(t.monthly_rent) || 0), 0);
 
   return (
     <div className="space-y-6">
@@ -115,7 +85,7 @@ export default function TenantsPage({ params }: { params: { id: string } }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">Tenants{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}</h2>
-          <p className="text-xs text-muted-foreground mt-0.5">{tenants.length} tenant{tenants.length !== 1 ? "s" : ""} · {formatCurrency(totalRent)}/mo total rent</p>
+          <p className="text-xs text-muted-foreground mt-0.5">{(tenants || []).length} tenant{(tenants || []).length !== 1 ? "s" : ""} · {formatCurrency(totalRent)}/mo total rent</p>
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
@@ -195,7 +165,7 @@ export default function TenantsPage({ params }: { params: { id: string } }) {
       )}
 
       {/* Tenant cards */}
-      {tenants.length === 0 && !showForm ? (
+      {(tenants || []).length === 0 && !showForm ? (
         <div className="rounded-lg border bg-card py-14 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Users className="h-7 w-7 text-muted-foreground" />
@@ -211,7 +181,7 @@ export default function TenantsPage({ params }: { params: { id: string } }) {
         </div>
       ) : (
         <div className="grid gap-4 md:grid-cols-2">
-          {tenants.map((t) => {
+          {(tenants || []).map((t) => {
             const leaseActive = t.lease_end && new Date(t.lease_end) >= new Date();
             return (
               <div key={t.id} className="group rounded-lg border bg-card overflow-hidden">

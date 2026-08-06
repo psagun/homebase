@@ -6,23 +6,14 @@ import {
   Landmark, CalendarClock, DollarSign, Receipt, Layers,
 } from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
+import { useTaxes } from "@/lib/hooks/useTaxes";
+import { createTax, updateTax, deleteTax, type TaxData } from "@/lib/api/taxes";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
 import { PayPortalButton } from "@/components/shared/PayPortalButton";
 import { formatCurrency } from "@/lib/utils";
-
-interface TaxData {
-  id: string;
-  county?: string;
-  tax_authority?: string;
-  parcel_id?: string;
-  portal_url?: string;
-  annual_tax?: number;
-  payment_frequency?: string;
-  next_due_date?: string;
-}
 
 const EMPTY_FORM = {
   county: "",
@@ -37,24 +28,12 @@ const EMPTY_FORM = {
 export default function TaxesPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property } = useProperty(id);
-  const [taxes, setTaxes] = useState<TaxData[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState(false);
+  const { data: taxes, isLoading, isError, refetch } = useTaxes(id);
   const [showForm, setShowForm] = useState(false);
   const [editId, setEditId] = useState<string | null>(null);
   const [form, setForm] = useState({ ...EMPTY_FORM });
   const [saving, setSaving] = useState(false);
   const [msg, setMsg] = useState<{ text: string; ok: boolean } | null>(null);
-
-  const loadTaxes = async () => {
-    const r = await fetch(`/api/v1/properties/${id}/taxes`, { credentials: "include" });
-    if (!r.ok) throw new Error("Failed to load");
-    setTaxes(await r.json());
-  };
-
-  useEffect(() => {
-    loadTaxes().catch(() => setError(true)).finally(() => setLoading(false));
-  }, [id]);
 
   const resetForm = () => { setForm({ ...EMPTY_FORM }); setEditId(null); setShowForm(false); };
 
@@ -63,21 +42,11 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
     try {
       const payload = { ...form, annual_tax: Number(form.annual_tax) || 0 };
       if (editId) {
-        const r = await fetch(`/api/v1/properties/${id}/taxes/${editId}`, {
-          method: "PATCH", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error("Update failed");
+        await updateTax(id, editId, payload);
       } else {
-        const r = await fetch(`/api/v1/properties/${id}/taxes`, {
-          method: "POST", credentials: "include",
-          headers: { "Content-Type": "application/json" },
-          body: JSON.stringify(payload),
-        });
-        if (!r.ok) throw new Error("Add failed");
+        await createTax(id, payload);
       }
-      await loadTaxes();
+      await refetch();
       resetForm();
       setMsg({ text: editId ? "Tax record updated" : "Tax record added", ok: true });
       setTimeout(() => setMsg(null), 2500);
@@ -104,22 +73,19 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
 
   const handleDelete = async (t: TaxData) => {
     try {
-      const r = await fetch(`/api/v1/properties/${id}/taxes/${t.id}`, {
-        method: "DELETE", credentials: "include",
-      });
-      if (!r.ok) throw new Error("Delete failed");
-      await loadTaxes();
+      await deleteTax(id, t.id);
+      await refetch();
     } catch {
       setMsg({ text: "Failed to delete tax record", ok: false });
       setTimeout(() => setMsg(null), 2500);
     }
   };
 
-  if (loading) return <LoadingState text="Loading tax info..." />;
-  if (error) return <ErrorState title="Failed to load taxes" onRetry={() => { setError(false); setLoading(true); loadTaxes().catch(() => setError(true)).finally(() => setLoading(false)); }} />;
+  if (isLoading) return <LoadingState text="Loading tax info..." />;
+  if (isError) return <ErrorState title="Failed to load taxes" onRetry={() => refetch()} />;
 
-  const totalAnnual = taxes.reduce((s, t) => s + (Number(t.annual_tax) || 0), 0);
-  const upcoming = taxes
+  const totalAnnual = (taxes || []).reduce((s, t) => s + (Number(t.annual_tax) || 0), 0);
+  const upcoming = (taxes || [])
     .filter((t) => t.next_due_date)
     .sort((a, b) => (a.next_due_date! > b.next_due_date! ? 1 : -1))[0];
 
@@ -146,7 +112,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
       )}
 
       {/* Summary strip */}
-      {taxes.length > 0 && !showForm && (
+      {(taxes || []).length > 0 && !showForm && (
         <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -154,7 +120,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
               <span className="text-xs font-semibold uppercase tracking-wider">Total Annual Tax</span>
             </div>
             <p className="text-xl font-bold text-foreground">{formatCurrency(totalAnnual)}</p>
-            <p className="text-xs text-muted-foreground mt-0.5">{taxes.length} record{taxes.length > 1 ? "s" : ""}</p>
+            <p className="text-xs text-muted-foreground mt-0.5">{(taxes || []).length} record{(taxes || []).length > 1 ? "s" : ""}</p>
           </div>
           <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center gap-2 text-muted-foreground mb-1">
@@ -172,7 +138,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
               <span className="text-xs font-semibold uppercase tracking-wider">Common Frequency</span>
             </div>
             <p className="text-xl font-bold text-foreground">
-              {taxes.map((t) => t.payment_frequency).filter(Boolean)[0] || "—"}
+              {(taxes || []).map((t) => t.payment_frequency).filter(Boolean)[0] || "—"}
             </p>
             <p className="text-xs text-muted-foreground mt-0.5">Payment schedule</p>
           </div>
@@ -245,7 +211,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
       )}
 
       {/* Empty state */}
-      {taxes.length === 0 && !showForm && (
+      {(taxes || []).length === 0 && !showForm && (
         <div className="rounded-lg border bg-card py-14 text-center">
           <div className="mx-auto flex h-14 w-14 items-center justify-center rounded-full bg-muted">
             <Landmark className="h-7 w-7 text-muted-foreground" />
@@ -262,7 +228,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
       )}
 
       {/* Tax record cards */}
-      {taxes.map((t) => (
+      {(taxes || []).map((t) => (
         <div key={t.id} className="group rounded-lg border bg-card overflow-hidden">
           {/* Card header */}
           <div className="flex items-center justify-between px-5 py-3.5 border-b bg-muted/30">
@@ -326,7 +292,7 @@ export default function TaxesPage({ params }: { params: { id: string } }) {
                     sourceId={t.id}
                     dueDate={t.next_due_date}
                     label="tax"
-                    onConfirmed={() => loadTaxes()}
+                    onConfirmed={() => refetch()}
                   />
                   <PayPortalButton
                     paymentType="tax"

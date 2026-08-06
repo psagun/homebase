@@ -87,7 +87,7 @@ export function TaskList({ propertyId }: { propertyId?: string }) {
         <div className="space-y-2">
           {tasks.map(task => (
             <div key={task.id} className={`flex items-center gap-3 rounded-lg border bg-card p-4 transition-colors ${task.status === "Overdue" ? "border-red-200 bg-red-50/30" : task.status === "Due Today" ? "border-amber-200 bg-amber-50/30" : ""}`}>
-              <button onClick={() => handleStatusChange(task.id, task.status === "Completed" ? "Upcoming" : "Completed")} className="flex-shrink-0">
+              <button aria-label={task.status === "Completed" ? "Mark as upcoming" : "Mark as completed"} onClick={() => handleStatusChange(task.id, task.status === "Completed" ? "Upcoming" : "Completed")} className="flex-shrink-0">
                 {statusIcons[task.status] || <Circle className="h-4 w-4 text-muted-foreground" />}
               </button>
               <div className="flex-1 min-w-0">
@@ -107,11 +107,19 @@ export function TaskList({ propertyId }: { propertyId?: string }) {
               </div>
               <div className="flex items-center gap-1">
                 {task.status !== "Dismissed" && task.status !== "Completed" && (
-                  <button onClick={() => handleStatusChange(task.id, "Dismissed")} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" title="Dismiss">
+                  <button aria-label="Dismiss task" onClick={() => handleStatusChange(task.id, "Dismissed")} className="rounded-md p-1.5 text-muted-foreground hover:bg-muted" title="Dismiss">
                     <Archive className="h-4 w-4" />
                   </button>
                 )}
-                <button onClick={() => deleteTask.mutateAsync(task.id)} className="rounded-md p-1.5 text-red-400 hover:bg-red-50" title="Delete">
+                <button
+                  aria-label={`Delete task: ${task.title}`}
+                  onClick={async () => {
+                    if (!window.confirm("Delete this task? This cannot be undone.")) return;
+                    try {
+                      await deleteTask.mutateAsync(task.id);
+                    } catch {}
+                  }}
+                  className="rounded-md p-1.5 text-red-400 hover:bg-red-50" title="Delete">
                   <span className="text-xs">✕</span>
                 </button>
               </div>

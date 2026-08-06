@@ -49,6 +49,9 @@ export function EditPropertySheet({
       {/* Slide-over panel */}
       <div
         ref={sheetRef}
+        role="dialog"
+        aria-modal="true"
+        aria-label="Edit property"
         className="fixed inset-y-0 right-0 z-50 w-full max-w-lg bg-background shadow-xl transition-transform"
       >
         <div className="flex h-full flex-col">

@@ -157,8 +157,10 @@ export default function PropertiesPage() {
                   const equityPct = purchase > 0 ? ((current - purchase) / purchase * 100).toFixed(2) : "0.00";
                   const equityNum = parseFloat(equityPct);
                   return (
-                    <tr key={p.id} className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
-                      onClick={() => window.location.href = `/properties/${p.id}`}>
+                    <tr key={p.id} role="link" tabIndex={0}
+                      className="border-b last:border-0 hover:bg-muted/30 transition-colors cursor-pointer"
+                      onClick={() => window.location.href = `/properties/${p.id}`}
+                      onKeyDown={(e) => { if (e.key === "Enter") window.location.href = `/properties/${p.id}`; }}>
                       <td className="p-4">
                         <div className="flex items-center gap-3">
                           <div className="flex h-8 w-8 items-center justify-center rounded-md bg-primary/10 text-primary text-xs font-bold">

@@ -48,6 +48,7 @@ const NAV_SECTIONS = [
 
 import { X } from "lucide-react";
 import { useAuth } from "@/lib/auth/useAuth";
+import { useDashboardSummary } from "@/lib/hooks/useDashboard";
 import { useRouter } from "next/navigation";
 
 interface SidebarProps {
@@ -68,14 +69,8 @@ export function Sidebar({ userName, userEmail, role, onClose }: SidebarProps) {
   const { logout } = useAuth();
   const router = useRouter();
   const pathname = usePathname();
-  const [propertyCount, setPropertyCount] = useState<number | null>(null);
-
-  useEffect(() => {
-    fetch("/api/v1/dashboard/summary", { credentials: "include" })
-      .then(res => res.json())
-      .then(data => setPropertyCount(data.total_properties ?? null))
-      .catch(() => {});
-  }, []);
+  const { data: summary } = useDashboardSummary();
+  const propertyCount = summary?.total_properties ?? null;
 
   const isActive = (href: string) => pathname.startsWith(href);
 
