@@ -114,10 +114,11 @@ export function ConfirmPaymentButton({
         <button
           type="button"
           onClick={() => setDialog("confirm")}
-          className="inline-flex items-center gap-2 rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted transition-colors"
+          title={formattedDue ? `Confirm the payment due ${formattedDue}` : "Confirm this payment"}
+          className="inline-flex h-9 items-center gap-1.5 rounded-md border border-emerald-200 bg-emerald-50 px-3 text-xs font-medium text-emerald-700 hover:bg-emerald-100 transition-colors"
         >
-          <CheckCircle2 className="h-4 w-4 text-emerald-600" />
-          Confirm Payment{formattedDue ? ` for ${formattedDue}` : ""}
+          <CheckCircle2 className="h-3.5 w-3.5" />
+          Confirm
         </button>
       )}
 
