@@ -188,7 +188,7 @@ def create_hoa_fee(property_id: uuid.UUID, data: HoaFeeCreate, cur=Depends(get_c
     _validate_portal_url(data.portal_url)
     h = HoaFee(id=uuid.uuid4(), property_id=property_id, **_clean_values(HoaFee, data.model_dump()))
     db.add(h); db.commit(); db.refresh(h)
-    notification_service.maybe_send(db, cur.id, "bill", "HOA fee added", "HOA fee for {name} was added.".format(name=h.association_name))
+    notification_service.maybe_send(db, cur.id, "bill", "HOA added", "HOA for {name} was added.".format(name=h.association_name))
     return h
 
 
@@ -202,7 +202,7 @@ def update_hoa_fee(property_id: uuid.UUID, fee_id: uuid.UUID, data: HoaFeeUpdate
     for k, v in _clean_values(HoaFee, data.model_dump(exclude_unset=True)).items():
         setattr(fee, k, v)
     db.commit(); db.refresh(fee)
-    notification_service.maybe_send(db, cur.id, "bill", "HOA fee updated", "HOA fee for {name} was updated.".format(name=fee.association_name))
+    notification_service.maybe_send(db, cur.id, "bill", "HOA updated", "HOA for {name} was updated.".format(name=fee.association_name))
     return fee
 
 

@@ -99,6 +99,11 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
     });
   }, [id]);
 
+  // Earliest-due payment link — backs the Make Payment quick action
+  const earliestLink = [...paymentLinks].sort((a, b) =>
+    (a.dueDate || "9999").localeCompare(b.dueDate || "9999")
+  )[0];
+
   if (isLoading) return <LoadingState text="Loading property details..." />;
 
   if (isError) {
@@ -223,23 +228,36 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
       <div>
         <h2 className="text-base font-semibold mb-3">Quick Actions</h2>
         <div className="flex flex-wrap gap-3">
-          {paymentLinks.length > 0 ? paymentLinks.map((link, i) => (
-            <div key={i} className="flex items-center gap-2">
-              <PayPortalButton
-                paymentType={link.type}
-                sourceId={link.id}
-                url={link.url}
-                dueDate={link.dueDate}
-                label={link.label.replace("Pay ", "")}
-              />
-              <ConfirmPaymentButton
-                paymentType={link.type}
-                sourceId={link.id}
-                dueDate={link.dueDate}
-                label={link.type}
-              />
-            </div>
-          )) : (
+          {paymentLinks.length > 0 ? (
+            <>
+              {paymentLinks.map((link, i) => (
+                <div key={i} className="flex items-center gap-2">
+                  <PayPortalButton
+                    paymentType={link.type}
+                    sourceId={link.id}
+                    url={link.url}
+                    dueDate={link.dueDate}
+                    label={link.label.replace("Pay ", "")}
+                  />
+                  <ConfirmPaymentButton
+                    paymentType={link.type}
+                    sourceId={link.id}
+                    dueDate={link.dueDate}
+                    label={link.type}
+                  />
+                </div>
+              ))}
+              {earliestLink && (
+                <PayPortalButton
+                  paymentType={earliestLink.type}
+                  sourceId={earliestLink.id}
+                  url={earliestLink.url}
+                  dueDate={earliestLink.dueDate}
+                  label="Make Payment"
+                />
+              )}
+            </>
+          ) : (
             <ActionButton icon={<DollarSign className="h-4 w-4" />} label="Make Payment" />
           )}
           <ActionButton icon={<FileText className="h-4 w-4" />} label="Add Document" />

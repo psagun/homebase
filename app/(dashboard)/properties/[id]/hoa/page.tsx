@@ -63,10 +63,10 @@ export default function HoaPage({ params }: { params: { id: string } }) {
       }
       await refetch();
       resetForm();
-      setMsg({ text: editId ? "HOA fee updated" : "HOA fee added", ok: true });
+      setMsg({ text: editId ? "HOA updated" : "HOA added", ok: true });
       setTimeout(() => setMsg(null), 2500);
     } catch {
-      setMsg({ text: "Failed to save HOA fee", ok: false });
+      setMsg({ text: "Failed to save HOA", ok: false });
     }
     setSaving(false);
   };
@@ -75,10 +75,10 @@ export default function HoaPage({ params }: { params: { id: string } }) {
     try {
       await deleteHoaFee(id, f.id);
       await refetch();
-      setMsg({ text: "HOA fee removed", ok: true });
+      setMsg({ text: "HOA removed", ok: true });
       setTimeout(() => setMsg(null), 2500);
     } catch {
-      setMsg({ text: "Failed to delete HOA fee", ok: false });
+      setMsg({ text: "Failed to delete HOA", ok: false });
       setTimeout(() => setMsg(null), 2500);
     }
   };
@@ -94,14 +94,14 @@ export default function HoaPage({ params }: { params: { id: string } }) {
       <div className="flex items-center justify-between">
         <div>
           <h2 className="text-lg font-semibold">
-            HOA Fees{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}
+            HOA{property ? <span className="text-muted-foreground font-normal"> — {property.name}</span> : ""}
           </h2>
           <p className="text-xs text-muted-foreground mt-0.5">Homeowners association dues and payment portals</p>
         </div>
         {!showForm && (
           <button onClick={() => setShowForm(true)}
             className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90 transition-colors">
-            <Plus className="h-4 w-4" /> Add HOA Fee
+            <Plus className="h-4 w-4" /> Add HOA
           </button>
         )}
       </div>
@@ -121,7 +121,7 @@ export default function HoaPage({ params }: { params: { id: string } }) {
                 className="mt-1 block w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="e.g. Oakwood HOA" />
             </div>
             <div>
-              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">Fee amount</label>
+              <label className="block text-xs font-medium text-muted-foreground uppercase tracking-wider">Amount</label>
               <input type="number" step="0.01" min="0" value={form.fee_amount}
                 onChange={(e) => setForm({ ...form, fee_amount: e.target.value })}
                 className="mt-1 block w-full rounded-md border bg-background px-3 py-2 text-sm" placeholder="e.g. 600" />
@@ -166,12 +166,12 @@ export default function HoaPage({ params }: { params: { id: string } }) {
       ) : list.length === 0 ? (
         <EmptyState
           icon={<Landmark className="h-16 w-16" />}
-          title="No HOA fees yet"
+          title="No HOA records yet"
           description="Track homeowners association dues, payment portals, and due dates."
           action={
             <button onClick={() => setShowForm(true)}
               className="inline-flex items-center gap-2 rounded-md bg-primary px-4 py-2 text-sm font-medium text-white hover:bg-primary/90">
-              <Plus className="h-4 w-4" /> Add HOA Fee
+              <Plus className="h-4 w-4" /> Add HOA
             </button>
           }
         />
@@ -197,7 +197,7 @@ export default function HoaPage({ params }: { params: { id: string } }) {
           </div>
 
           <div className="rounded-lg border bg-card overflow-x-auto">
-            <table className="w-full">
+            <table className="w-full min-w-[560px]">
               <thead>
                 <tr className="border-b bg-muted/50">
                   <th className="text-left p-3 text-xs font-semibold uppercase text-muted-foreground">Association</th>
@@ -205,7 +205,7 @@ export default function HoaPage({ params }: { params: { id: string } }) {
                   <th className="text-left p-3 text-xs font-semibold uppercase text-muted-foreground">Frequency</th>
                   <th className="text-left p-3 text-xs font-semibold uppercase text-muted-foreground">Next Due</th>
                   <th className="text-left p-3 text-xs font-semibold uppercase text-muted-foreground">Portal</th>
-                  <th className="p-3" />
+                  <th className="p-3 w-12" />
                 </tr>
               </thead>
               <tbody>
@@ -223,9 +223,9 @@ export default function HoaPage({ params }: { params: { id: string } }) {
                         </a>
                       ) : "—"}
                     </td>
-                    <td className="p-3 text-right">
+                    <td className="p-3 text-right sticky right-0 bg-card">
                       <ActionsMenu
-                        label="HOA fee"
+                        label="HOA"
                         actions={[
                           { label: "Edit", icon: <Pencil className="h-4 w-4" />, onClick: () => startEdit(f) },
                           { label: "Delete", icon: <Trash2 className="h-4 w-4" />, destructive: true, onClick: () => handleDelete(f) },
