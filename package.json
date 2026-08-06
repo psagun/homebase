@@ -2,7 +2,9 @@
   "name": "homebase",
   "version": "0.1.0",
   "private": true,
-  "engines": { "node": ">=18.18 <23" },
+  "engines": {
+    "node": ">=18.18 <23"
+  },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
@@ -13,6 +15,7 @@
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
+    "@supabase/supabase-js": "^2.112.1",
     "@tanstack/react-query": "^5.0.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.0",

@@ -1,7 +1,7 @@
 import { NextResponse } from "next/server";
 import type { NextRequest } from "next/server";
 
-const PUBLIC_ROUTES = ["/login", "/register"];
+const PUBLIC_ROUTES = ["/login", "/register", "/auth/callback"];
 const API_ROUTES = ["/api"];
 const STATIC_ROUTES = ["/_next", "/favicon.ico"];
 

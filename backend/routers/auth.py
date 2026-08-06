@@ -1,5 +1,6 @@
 import bcrypt
 import os
+import secrets
 import uuid
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, status
 from pydantic import BaseModel, Field
@@ -27,6 +28,10 @@ class ChangePasswordRequest(BaseModel):
 
 class ProfileUpdateRequest(BaseModel):
     name: str | None = Field(None, min_length=1, max_length=200)
+
+
+class GoogleAuthRequest(BaseModel):
+    access_token: str = Field(..., min_length=1)
 
 router = APIRouter()
 
@@ -149,6 +154,58 @@ def register(
     auth: AuthService = Depends(get_auth_service),
 ):
     result = auth.register(email=data.email, password=data.password, name=data.name)
+    return _set_token_cookies(response, result)
+
+
+@router.post("/google", response_model=TokenResponse)
+@rate_limit("10/minute")
+def google_auth(
+    request: Request,
+    data: GoogleAuthRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    auth: AuthService = Depends(get_auth_service),
+):
+    """Sign in with Google via Supabase Auth.
+
+    Verifies the Supabase session token server-side (service-role client),
+    then finds-or-creates the matching HomeBase account by email and
+    issues the app's own JWT cookies — the rest of the app is unchanged.
+    New accounts get role "user", same as self-registration.
+    """
+    from backend.services import document_storage_service
+
+    client = document_storage_service.get_supabase_admin_client()
+    if not client:
+        raise HTTPException(status_code=503, detail="Supabase auth is not configured")
+    try:
+        supabase_user = client.auth.get_user(data.access_token).user
+    except Exception:
+        raise HTTPException(status_code=401, detail="Invalid or expired Google session")
+
+    email = (supabase_user.email or "").strip().lower()
+    if not email:
+        raise HTTPException(status_code=401, detail="Google account has no email address")
+
+    user = db.query(User).filter(User.email == email).first()
+    if not user:
+        # Auto-create. Google accounts have no app password — hash a random
+        # unguessable value so the password flow can never be used for them.
+        metadata = supabase_user.user_metadata or {}
+        user = User(
+            id=uuid.uuid4(),
+            email=email,
+            password_hash=bcrypt.hashpw(
+                secrets.token_urlsafe(32).encode("utf-8"), bcrypt.gensalt()
+            ).decode("utf-8"),
+            name=metadata.get("full_name") or email.split("@")[0],
+            role="user",
+        )
+        db.add(user)
+        db.commit()
+        db.refresh(user)
+
+    result = auth._generate_tokens(user)
     return _set_token_cookies(response, result)
 
 

@@ -39,6 +39,15 @@ def _supabase_client():
     return create_client(url, key)
 
 
+def get_supabase_admin_client():
+    """Public accessor for the service-role Supabase client (server-side only).
+
+    Used for storage AND for verifying Supabase Auth sessions (Google OAuth
+    sign-in). Never expose this key to the frontend.
+    """
+    return _supabase_client()
+
+
 def _ensure_bucket(client) -> None:
     """Create the private documents bucket if it doesn't exist."""
     try:
