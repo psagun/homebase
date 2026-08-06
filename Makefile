@@ -1,21 +1,21 @@
-.PHONY: install run test lint clean seed
+.PHONY: install run test lint seed clean
 
 install:
-	cd backend && pip install -r requirements/dev.txt
+	pip install -r requirements.txt
 
 run:
-	cd backend && python -m app.main
+	python -m uvicorn backend.main:app --port 8001 --reload
 
 test:
-	cd backend && python -m pytest tests/ -v --cov=app
+	python -m pytest tests/ -q
 
 lint:
-	cd backend && python -m ruff check app/ tests/
+	python -m ruff check backend/ tests/
+
+seed:
+	python -c "from backend.database import Base, engine; import backend.models; Base.metadata.create_all(bind=engine); from backend.routers.seed import seed_database; print(seed_database(key='dev-cron-secret'))"
 
 clean:
 	find . -type d -name __pycache__ -exec rm -rf {} + 2>/dev/null || true
 	find . -name "*.pyc" -delete
-	rm -f backend/*.db
-
-seed:
-	cd backend && python -c "from app.main import seed_data; seed_data(); print('✅ Database seeded')"
+	rm -f homebase.db homebase-dev.db

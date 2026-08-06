@@ -38,6 +38,7 @@ htmlcov/
 
 .vercel
 .env*
+!.env.example
 login_resp.json
 login_response.json
 .migrate_source.txt

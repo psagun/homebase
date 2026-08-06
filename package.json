@@ -2,14 +2,14 @@
   "name": "homebase",
   "version": "0.1.0",
   "private": true,
+  "engines": { "node": ">=18.18 <23" },
   "scripts": {
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "lint": "next lint",
     "typecheck": "tsc --noEmit",
-    "test": "vitest run",
-    "test:watch": "vitest"
+    "test": "python -m pytest tests/ -q"
   },
   "dependencies": {
     "@hookform/resolvers": "^3.9.0",
