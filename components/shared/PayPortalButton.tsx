@@ -4,7 +4,7 @@ import { ExternalLink } from "lucide-react";
 import { usePendingPayment } from "@/lib/hooks/usePendingPayment";
 
 interface PayPortalButtonProps {
-  paymentType: "mortgage" | "insurance" | "tax";
+  paymentType: "mortgage" | "insurance" | "tax" | "hoa";
   sourceId: string;
   url: string;
   /** The record's current due date — stored so the confirm dialog knows which cycle to confirm */

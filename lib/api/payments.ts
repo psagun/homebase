@@ -9,7 +9,7 @@ export interface PaymentConfirmResult {
   recorded_at: string;
 }
 
-export type PaymentType = "mortgage" | "insurance" | "tax";
+export type PaymentType = "mortgage" | "insurance" | "tax" | "hoa";
 
 export interface PaymentHistoryItem {
   id: string;

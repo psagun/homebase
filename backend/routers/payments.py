@@ -81,8 +81,13 @@ def _get_source_record(db: Session, user_id: uuid.UUID, payment_type: str, sourc
             text("SELECT t.id, t.property_id, t.next_due_date, t.payment_frequency FROM property_taxes t WHERE t.id = :id" + lock),
             {"id": sid},
         ).first()
+    elif payment_type == "hoa":
+        row = db.execute(
+            text("SELECT h.id, h.property_id, h.next_due_date, h.payment_frequency FROM hoa_fees h WHERE h.id = :id" + lock),
+            {"id": sid},
+        ).first()
     else:
-        raise HTTPException(status_code=400, detail="payment_type must be mortgage, insurance, or tax")
+        raise HTTPException(status_code=400, detail="payment_type must be mortgage, insurance, tax, or hoa")
 
     if not row:
         raise HTTPException(status_code=404, detail=f"{payment_type} record not found")
@@ -135,7 +140,7 @@ def confirm_payment(
     elif payment_type == "insurance":
         due = row.renewal_date
         frequency = row.payment_frequency or "Annual"
-    else:
+    else:  # tax / hoa
         due = row.next_due_date
         frequency = row.payment_frequency or "Annual"
 
@@ -164,15 +169,20 @@ def confirm_payment(
             text("UPDATE insurance_policies SET renewal_date = :nd WHERE id = :id"),
             {"nd": str(next_due), "id": _hex(source_id)},
         )
-    else:
+    elif payment_type == "tax":
         db.execute(
             text("UPDATE property_taxes SET next_due_date = :nd WHERE id = :id"),
+            {"nd": str(next_due), "id": _hex(source_id)},
+        )
+    else:
+        db.execute(
+            text("UPDATE hoa_fees SET next_due_date = :nd WHERE id = :id"),
             {"nd": str(next_due), "id": _hex(source_id)},
         )
 
     # Sync the related task: advance due date, reset status to Upcoming.
     # task_type is a PostgreSQL enum — use the enum member names.
-    task_type_enum = {"mortgage": "MORTGAGE_PAYMENT", "insurance": "INSURANCE_RENEWAL", "tax": "PROPERTY_TAX"}[payment_type]
+    task_type_enum = {"mortgage": "MORTGAGE_PAYMENT", "insurance": "INSURANCE_RENEWAL", "tax": "PROPERTY_TAX", "hoa": "HOA_PAYMENT"}[payment_type]
     db.execute(
         text(
             """
@@ -229,6 +239,7 @@ def _load_source_amounts(db: Session, records: list) -> dict:
         "mortgage": ("mortgages", "monthly_payment"),
         "insurance": ("insurance_policies", "annual_premium"),
         "tax": ("property_taxes", "annual_tax"),
+        "hoa": ("hoa_fees", "fee_amount"),
     }
     for ptype, ids in by_type.items():
         table, col = amount_cols.get(ptype, (None, None))
@@ -337,6 +348,11 @@ def undo_payment(
             text("UPDATE property_taxes SET next_due_date = :d WHERE id = :sid"),
             {"d": due_str, "sid": sid},
         )
+    elif record.payment_type == "hoa":
+        db.execute(
+            text("UPDATE hoa_fees SET next_due_date = :d WHERE id = :sid"),
+            {"d": due_str, "sid": sid},
+        )
 
     # Re-sync the task: restore the due date and recompute status from today.
     # task_type is a PostgreSQL enum — use the enum member names.
@@ -344,6 +360,7 @@ def undo_payment(
         "mortgage": "MORTGAGE_PAYMENT",
         "insurance": "INSURANCE_RENEWAL",
         "tax": "PROPERTY_TAX",
+        "hoa": "HOA_PAYMENT",
     }[record.payment_type]
     today = date.today()
     if record.due_date < today:

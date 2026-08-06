@@ -2,7 +2,7 @@
 
 import { useMemo, useState } from "react";
 import Link from "next/link";
-import { Landmark, ShieldCheck, Receipt, CreditCard, CalendarCheck, ArrowRight, Undo2, CheckCircle2 } from "lucide-react";
+import { Landmark, ShieldCheck, Receipt, CreditCard, CalendarCheck, ArrowRight, Undo2, CheckCircle2, Building2 } from "lucide-react";
 import { usePaymentHistory, useDeletePaymentHistory } from "@/lib/hooks/usePayments";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { LoadingState } from "@/components/shared/LoadingState";
@@ -12,10 +12,11 @@ import { ActionsMenu } from "@/components/shared/ActionsMenu";
 import { formatCurrency, formatDate, formatDateFull, formatRelativeDate, capitalize } from "@/lib/utils";
 import type { PaymentHistoryItem, PaymentType } from "@/lib/api/payments";
 
-const TYPE_META: Record<"mortgage" | "insurance" | "tax", { Icon: typeof Landmark; bg: string; color: string; tab: string }> = {
+const TYPE_META: Record<PaymentType, { Icon: typeof Landmark; bg: string; color: string; tab: string }> = {
   mortgage: { Icon: Landmark, bg: "#eef2ff", color: "#3b82f6", tab: "/mortgage" },
   insurance: { Icon: ShieldCheck, bg: "#faf5ff", color: "#9333ea", tab: "/insurance" },
   tax: { Icon: Receipt, bg: "#fefce8", color: "#ca8a04", tab: "/taxes" },
+  hoa: { Icon: Building2, bg: "#fdf2f8", color: "#db2777", tab: "/hoa" },
 };
 
 const FILTERS = [
@@ -23,6 +24,7 @@ const FILTERS = [
   { value: "mortgage", label: "Mortgage" },
   { value: "insurance", label: "Insurance" },
   { value: "tax", label: "Taxes" },
+  { value: "hoa", label: "HOA" },
 ] as const;
 
 export default function PaymentsPage({ params }: { params: { id: string } }) {
@@ -201,7 +203,7 @@ function TimelineEntry({ record, propertyId, canUndo, onUndo }: {
               href={`/properties/${propertyId}${meta.tab}`}
               className="text-sm font-semibold text-foreground hover:text-primary transition-colors"
             >
-              {capitalize(record.payment_type)} payment
+              {record.payment_type === "hoa" ? "HOA" : capitalize(record.payment_type)} payment
             </Link>
             {record.amount != null && (
               <span className="text-sm font-bold text-emerald-600">{formatCurrency(record.amount)}</span>

@@ -6,7 +6,7 @@ import { confirmPayment, fetchPaymentHistory } from "@/lib/api/payments";
 import { usePendingPayment } from "@/lib/hooks/usePendingPayment";
 
 interface ConfirmPaymentButtonProps {
-  paymentType: "mortgage" | "insurance" | "tax";
+  paymentType: "mortgage" | "insurance" | "tax" | "hoa";
   sourceId: string;
   /** The record's CURRENT due date — this is the payment cycle being confirmed */
   dueDate?: string | null;
@@ -20,6 +20,7 @@ const TYPE_LABEL: Record<string, string> = {
   mortgage: "mortgage",
   insurance: "insurance",
   tax: "tax",
+  hoa: "hoa",
 };
 
 /**

@@ -47,3 +47,34 @@ def test_hoa_crud(auth_client):
     resp = auth_client.delete(f"/api/v1/properties/{pid}/hoa/{fee['id']}")
     assert resp.status_code == 204
     assert len(auth_client.get(f"/api/v1/properties/{pid}/hoa").json()) == 1
+
+
+def test_hoa_payment_confirm_and_undo(auth_client):
+    """HOA fees participate in the payment confirm/undo flow."""
+    from datetime import date, timedelta
+
+    pid = auth_client.post("/api/v1/properties", json=PROPERTY_PAYLOAD).json()["id"]
+    due = str(date.today() + timedelta(days=30))
+    fee = auth_client.post(f"/api/v1/properties/{pid}/hoa", json={
+        "association_name": "Oakwood HOA", "fee_amount": 600,
+        "payment_frequency": "Quarterly", "next_due_date": due,
+    }).json()
+
+    resp = auth_client.post("/api/v1/payments/confirm", params={
+        "payment_type": "hoa", "source_id": fee["id"], "due_date": due,
+    })
+    assert resp.status_code == 200, resp.text
+
+    # Due date advanced, history recorded with amount
+    updated = auth_client.get(f"/api/v1/properties/{pid}/hoa").json()[0]
+    assert updated["next_due_date"] != due
+    history = auth_client.get("/api/v1/payments/history", params={"property_id": pid}).json()
+    assert len(history) == 1
+    assert history[0]["payment_type"] == "hoa"
+    assert history[0]["amount"] == 600.0
+
+    # Undo restores the date
+    resp = auth_client.delete(f"/api/v1/payments/history/{history[0]['id']}")
+    assert resp.status_code == 200
+    updated = auth_client.get(f"/api/v1/properties/{pid}/hoa").json()[0]
+    assert updated["next_due_date"] == due

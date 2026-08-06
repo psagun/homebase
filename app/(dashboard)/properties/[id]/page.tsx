@@ -5,6 +5,7 @@ import Link from "next/link";
 import { DollarSign, CalendarCheck, FileText, ShieldCheck, Wrench, Plus, Landmark, ExternalLink, Building2, Receipt } from "lucide-react";
 import { useProperty } from "@/lib/hooks/useProperties";
 import { useTasks } from "@/lib/hooks/useTasks";
+import type { PaymentType } from "@/lib/api/payments";
 import { LoadingState } from "@/components/shared/LoadingState";
 import { ErrorState } from "@/components/shared/ErrorState";
 import { ConfirmPaymentButton } from "@/components/shared/ConfirmPaymentButton";
@@ -43,7 +44,7 @@ function reminderIcon(r: ReminderItem): { icon: React.ReactNode; bg: string; col
 export default function PropertyOverviewPage({ params }: { params: { id: string } }) {
   const { id } = params;
   const { data: property, isLoading, isError, refetch } = useProperty(id);
-  const [paymentLinks, setPaymentLinks] = useState<{ label: string; url: string; icon: React.ReactNode; type: "mortgage" | "insurance" | "tax"; id: string; dueDate?: string | null }[]>([]);
+  const [paymentLinks, setPaymentLinks] = useState<{ label: string; url: string; icon: React.ReactNode; type: PaymentType; id: string; dueDate?: string | null }[]>([]);
   const [reminders, setReminders] = useState<ReminderItem[]>([]);
   const [remindersLoading, setRemindersLoading] = useState(true);
   const [summaryData, setSummaryData] = useState<{ mortgage: any; insurance: any; taxes: any[]; tenants: any[] }>({
@@ -73,13 +74,15 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
       fetch(`/api/v1/properties/${id}/insurance`, { credentials: "include" }).then(r => r.json()).catch(() => null),
       fetch(`/api/v1/properties/${id}/taxes`, { credentials: "include" }).then(r => r.json()).catch(() => null),
       fetch(`/api/v1/properties/${id}/tenants`, { credentials: "include" }).then(r => r.json()).catch(() => []),
-    ]).then(([mortgage, insurance, taxes, tenants]) => {
+      fetch(`/api/v1/properties/${id}/hoa`, { credentials: "include" }).then(r => r.json()).catch(() => []),
+    ]).then(([mortgage, insurance, taxes, tenants, hoaFees]) => {
       setSummaryData({
         mortgage, insurance,
         taxes: Array.isArray(taxes) ? taxes : [],
         tenants: Array.isArray(tenants) ? tenants : [],
       });
-      const links: { label: string; url: string; icon: React.ReactNode; type: "mortgage" | "insurance" | "tax"; id: string; dueDate?: string | null }[] = [];
+      const hoaList = Array.isArray(hoaFees) ? hoaFees : [];
+      const links: { label: string; url: string; icon: React.ReactNode; type: PaymentType; id: string; dueDate?: string | null }[] = [];
       if (mortgage?.portal_url) links.push({
         label: "Pay Mortgage", url: mortgage.portal_url, icon: <Landmark className="h-4 w-4" />,
         type: "mortgage" as const, id: mortgage.id, dueDate: mortgage.next_due_date,
@@ -95,6 +98,11 @@ export default function PropertyOverviewPage({ params }: { params: { id: string 
           type: "tax" as const, id: tax.id, dueDate: tax.next_due_date,
         });
       }
+      const hoa = hoaList.find((h: any) => h?.portal_url && /^https?:\/\//.test(h.portal_url));
+      if (hoa?.portal_url) links.push({
+        label: "Pay HOA", url: hoa.portal_url, icon: <Building2 className="h-4 w-4" />,
+        type: "hoa" as const, id: hoa.id, dueDate: hoa.next_due_date,
+      });
       setPaymentLinks(links);
     });
   }, [id]);
