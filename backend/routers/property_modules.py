@@ -11,10 +11,11 @@ from backend.models.property import Property
 from backend.models.property_tax import PropertyTax
 from backend.models.tenant import Tenant
 from backend.models.maintenance_record import MaintenanceRecord
+from backend.models.hoa_fee import HoaFee
 from backend.services import notification_service
 from backend.schemas.property_modules import (
     TaxCreate, TaxUpdate, TenantCreate, TenantUpdate,
-    MaintenanceCreate, MaintenanceUpdate,
+    MaintenanceCreate, MaintenanceUpdate, HoaFeeCreate, HoaFeeUpdate,
 )
 
 router = APIRouter()
@@ -86,7 +87,7 @@ def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: TaxUpdate, cur=D
     if not tax:
         raise HTTPException(404, "Tax record not found")
     _validate_portal_url(data.portal_url)
-    for k, v in _clean_values(PropertyTax, data.model_dump()).items():
+    for k, v in _clean_values(PropertyTax, data.model_dump(exclude_unset=True)).items():
         setattr(tax, k, v)
     db.commit(); db.refresh(tax)
     notification_service.maybe_send(db, cur.id, "property", "Tax record updated", "A tax record on your property was updated.")
@@ -121,7 +122,7 @@ def update_tenant(property_id: uuid.UUID, tenant_id: uuid.UUID, data: TenantUpda
     ).first()
     if not tenant:
         raise HTTPException(404, "Tenant not found")
-    for k, v in _clean_values(Tenant, data.model_dump()).items():
+    for k, v in _clean_values(Tenant, data.model_dump(exclude_unset=True)).items():
         setattr(tenant, k, v)
     db.commit(); db.refresh(tenant)
     notification_service.maybe_send(db, cur.id, "tenant", "Tenant updated", "Tenant {name} was updated.".format(name=tenant.name))
@@ -158,7 +159,7 @@ def update_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, data: Maint
     ).first()
     if not rec:
         raise HTTPException(404, "Maintenance record not found")
-    for k, v in _clean_values(MaintenanceRecord, data.model_dump()).items():
+    for k, v in _clean_values(MaintenanceRecord, data.model_dump(exclude_unset=True)).items():
         setattr(rec, k, v)
     db.commit(); db.refresh(rec)
     notification_service.maybe_send(db, cur.id, "maintenance", "Maintenance record updated", "Maintenance record {title} was updated in your log.".format(title=rec.title))
@@ -173,3 +174,42 @@ def delete_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, cur=Depends
     if not rec:
         raise HTTPException(404, "Maintenance record not found")
     db.delete(rec); db.commit()
+
+
+@router.get("/properties/{property_id}/hoa")
+def list_hoa_fees(property_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    return db.query(HoaFee).filter(HoaFee.property_id == property_id).order_by(HoaFee.next_due_date.asc().nullslast()).all()
+
+
+@router.post("/properties/{property_id}/hoa")
+def create_hoa_fee(property_id: uuid.UUID, data: HoaFeeCreate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    _validate_portal_url(data.portal_url)
+    h = HoaFee(id=uuid.uuid4(), property_id=property_id, **_clean_values(HoaFee, data.model_dump()))
+    db.add(h); db.commit(); db.refresh(h)
+    notification_service.maybe_send(db, cur.id, "bill", "HOA fee added", "HOA fee for {name} was added.".format(name=h.association_name))
+    return h
+
+
+@router.patch("/properties/{property_id}/hoa/{fee_id}")
+def update_hoa_fee(property_id: uuid.UUID, fee_id: uuid.UUID, data: HoaFeeUpdate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    fee = db.query(HoaFee).filter(HoaFee.id == fee_id, HoaFee.property_id == property_id).first()
+    if not fee:
+        raise HTTPException(404, "HOA fee record not found")
+    _validate_portal_url(data.portal_url)
+    for k, v in _clean_values(HoaFee, data.model_dump(exclude_unset=True)).items():
+        setattr(fee, k, v)
+    db.commit(); db.refresh(fee)
+    notification_service.maybe_send(db, cur.id, "bill", "HOA fee updated", "HOA fee for {name} was updated.".format(name=fee.association_name))
+    return fee
+
+
+@router.delete("/properties/{property_id}/hoa/{fee_id}", status_code=204)
+def delete_hoa_fee(property_id: uuid.UUID, fee_id: uuid.UUID, cur=Depends(get_current_user), db: Session = Depends(get_db)):
+    _get_prop(cur, property_id, db)
+    fee = db.query(HoaFee).filter(HoaFee.id == fee_id, HoaFee.property_id == property_id).first()
+    if not fee:
+        raise HTTPException(404, "HOA fee record not found")
+    db.delete(fee); db.commit()

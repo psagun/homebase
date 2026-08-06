@@ -22,7 +22,7 @@ try:
     from backend.models import (  # noqa: E402, F401
         User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction,
         Contact, PropertyTax, Tenant, MaintenanceRecord, RecentlyViewed,
-        PropertyInvestor, OwnershipEntity, Investor, OwnershipEntityInvestor,
+        PropertyInvestor, OwnershipEntity, Investor, OwnershipEntityInvestor, HoaFee,
     )
     Base.metadata.create_all(bind=engine)
 except Exception as e:

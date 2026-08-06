@@ -68,3 +68,16 @@ class MaintenanceCreate(_EmptyStrToNone):
 
 class MaintenanceUpdate(MaintenanceCreate):
     title: Optional[str] = Field(None, min_length=1, max_length=200)
+
+
+class HoaFeeCreate(_EmptyStrToNone):
+    association_name: str = Field(..., min_length=1, max_length=200)
+    fee_amount: Optional[float] = None
+    payment_frequency: Optional[str] = None
+    next_due_date: Optional[date] = None
+    portal_url: Optional[str] = None
+    notes: Optional[str] = None
+
+
+class HoaFeeUpdate(HoaFeeCreate):
+    association_name: Optional[str] = Field(None, min_length=1, max_length=200)

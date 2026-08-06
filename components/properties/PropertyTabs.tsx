@@ -9,6 +9,7 @@ const TABS = [
   { label: "Mortgage", href: "/mortgage" },
   { label: "Insurance", href: "/insurance" },
   { label: "Taxes", href: "/taxes" },
+  { label: "HOA", href: "/hoa" },
   { label: "Tenants", href: "/tenants" },
   { label: "Contacts", href: "/contacts" },
   { label: "Documents", href: "/documents" },

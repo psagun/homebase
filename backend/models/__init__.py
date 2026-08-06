@@ -16,3 +16,4 @@ from backend.models.ownership_entity import OwnershipEntity  # noqa: F401
 from backend.models.investor import Investor  # noqa: F401
 from backend.models.ownership_entity_investor import OwnershipEntityInvestor  # noqa: F401
 from backend.models.payment_history import PaymentHistory  # noqa: F401
+from backend.models.hoa_fee import HoaFee  # noqa: F401

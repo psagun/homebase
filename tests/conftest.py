@@ -9,7 +9,7 @@ from backend.dependencies import get_db
 from backend.main import app
 
 # Import ALL models so they register with Base.metadata
-from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact  # noqa: F401
+from backend.models import User, Property, Mortgage, InsurancePolicy, Document, Task, Transaction, Contact, HoaFee  # noqa: F401
 
 engine = create_engine("sqlite://", connect_args={"check_same_thread": False}, poolclass=StaticPool)
 TestingSessionLocal = sessionmaker(autocommit=False, autoflush=False, bind=engine)
