@@ -57,6 +57,8 @@ def test_user_scoping(auth_client, client):
 
     # User B registers and lists
     client.post("/api/v1/auth/register", json={"email": "b@test.com", "password": "pass12345", "name": "B"})
+    from tests.conftest import verify_email
+    verify_email("b@test.com")
     resp = client.post("/api/v1/auth/login", json={"email": "b@test.com", "password": "pass12345"})
     token = resp.json()["access_token"]
     resp = client.get("/api/v1/properties/", headers={"Authorization": f"Bearer {token}"})

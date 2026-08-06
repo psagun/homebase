@@ -25,6 +25,10 @@ def _register(client, email, password="testpass123", name="New User"):
         "email": email, "password": password, "name": name,
     })
     assert resp.status_code == 200
+    from tests.conftest import verify_email
+    verify_email(email)
+    resp = client.post("/api/v1/auth/login", json={"email": email, "password": password})
+    assert resp.status_code == 200
     return resp.json()["access_token"]
 
 

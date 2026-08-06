@@ -235,43 +235,93 @@ function SecurityTab() {
 }
 
 /* ─── Notifications Tab ─── */
+const NOTIF_CATEGORIES = [
+  { key: "account", label: "Account", desc: "Welcome and security emails" },
+  { key: "property", label: "Property changes", desc: "Properties, transactions, and taxes" },
+  { key: "tenant", label: "Tenants", desc: "When tenants are added or updated" },
+  { key: "maintenance", label: "Maintenance", desc: "When maintenance records change" },
+  { key: "bill", label: "Bills", desc: "Mortgage and insurance changes" },
+  { key: "payment", label: "Payments", desc: "Payment confirmations and undo" },
+  { key: "document", label: "Documents", desc: "When documents are uploaded" },
+];
+
 function NotificationsTab() {
-  const items = [
-    { id: "overdue", label: "Overdue tasks", desc: "When a task passes its due date", on: true },
-    { id: "today", label: "Due today reminders", desc: "Daily digest of tasks due today", on: true },
-    { id: "insurance", label: "Insurance renewals", desc: "Before insurance policies expire", on: true },
-    { id: "rent", label: "Rent collection", desc: "When rent payments are due or overdue", on: false },
-    { id: "mortgage", label: "Mortgage payments", desc: "Upcoming mortgage payment alerts", on: true },
-    { id: "documents", label: "Document expirations", desc: "When leases or docs are expiring", on: false },
-  ];
+  const [prefs, setPrefs] = useState<Record<string, boolean> | null>(null);
+  const [saving, setSaving] = useState(false);
+
+  useEffect(() => {
+    fetch("/api/v1/notifications/prefs", { credentials: "include" })
+      .then((r) => r.json())
+      .then((d) => setPrefs(d.prefs || {}))
+      .catch(() => setPrefs({}));
+  }, []);
+
+  const toggle = async (key: string, value: boolean) => {
+    if (!prefs) return;
+    const next = { ...prefs, [key]: value };
+    const previous = prefs;
+    setPrefs(next);
+    setSaving(true);
+    try {
+      const res = await fetch("/api/v1/notifications/prefs", {
+        method: "PUT", credentials: "include",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify(next),
+      });
+      if (!res.ok) throw new Error("save failed");
+    } catch {
+      setPrefs(previous); // revert on failure
+    }
+    setSaving(false);
+  };
 
   return (
     <div className="bg-card rounded-xl border border-border shadow-sm p-6 space-y-5">
       <div>
         <h2 className="text-base font-semibold text-foreground">Notification Preferences</h2>
-        <p className="text-xs text-muted-foreground mt-0.5">Preferences are not configurable yet - coming soon</p>
+        <p className="text-xs text-muted-foreground mt-0.5">Email me when these things happen in my portfolio</p>
       </div>
       <div className="divide-y divide-border">
-        {items.map((item) => (
-          <NotificationRow key={item.id} {...item} />
+        {NOTIF_CATEGORIES.map((cat) => (
+          <NotificationRow
+            key={cat.key}
+            label={cat.label}
+            desc={cat.desc}
+            enabled={prefs ? !!prefs[cat.key] : false}
+            disabled={!prefs || saving}
+            onToggle={(value) => toggle(cat.key, value)}
+          />
         ))}
       </div>
     </div>
   );
 }
 
-function NotificationRow({ label, desc, on }: { label: string; desc: string; on: boolean }) {
+function NotificationRow({ label, desc, enabled, disabled, onToggle }: {
+  label: string; desc: string; enabled: boolean; disabled: boolean;
+  onToggle: (value: boolean) => void;
+}) {
   return (
     <div className="flex items-center justify-between py-3.5">
       <div>
         <p className="text-sm font-medium text-foreground">{label}</p>
         <p className="text-xs text-muted-foreground">{desc}</p>
       </div>
-      <span className={`rounded-full px-2.5 py-0.5 text-[10px] font-semibold ${
-        on ? "bg-primary/10 text-primary" : "bg-muted text-muted-foreground"
-      }`}>
-        {on ? "On" : "Off"}
-      </span>
+      <button
+        type="button"
+        role="switch"
+        aria-checked={enabled}
+        aria-label={`${label} notifications`}
+        onClick={() => onToggle(!enabled)}
+        disabled={disabled}
+        className={`relative inline-flex h-5 w-9 shrink-0 rounded-full border-2 border-transparent transition-colors duration-200 disabled:opacity-50 ${
+          enabled ? "bg-primary" : "bg-muted"
+        }`}
+      >
+        <span className={`pointer-events-none inline-block h-4 w-4 rounded-full bg-white shadow transition duration-200 ${
+          enabled ? "translate-x-4" : "translate-x-0"
+        }`} />
+      </button>
     </div>
   );
 }

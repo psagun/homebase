@@ -8,7 +8,7 @@ from sqlalchemy.orm import Session
 
 from backend.models.document import Document
 from backend.models.property import Property
-from backend.services import document_storage_service
+from backend.services import document_storage_service, notification_service
 
 
 def _get_property_or_404(db: Session, user_id, property_id) -> Property:
@@ -75,6 +75,11 @@ async def upload_document(db: Session, user_id, property_id, file: UploadFile, c
     db.add(doc)
     db.commit()
     db.refresh(doc)
+    notification_service.maybe_send(
+        db, user_id, "document",
+        "Document uploaded",
+        '"{name}" was uploaded to the property library.'.format(name=doc_name),
+    )
     return doc
 
 

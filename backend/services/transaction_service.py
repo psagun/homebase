@@ -8,6 +8,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import func, extract
 from sqlalchemy.orm import Session
 
+from backend.services import notification_service
+
 from backend.models.transaction import Transaction, TransactionType
 from backend.models.property import Property
 
@@ -47,6 +49,13 @@ def create_transaction(db: Session, user_id, property_id, data) -> Transaction:
     db.add(txn)
     db.commit()
     db.refresh(txn)
+    notification_service.maybe_send(
+        db, user_id, "property",
+        "Transaction added",
+        "A {category} transaction of ${amount:.2f} was recorded.".format(
+            category=data.category, amount=float(data.amount or 0),
+        ),
+    )
     return txn
 
 

@@ -33,6 +33,20 @@ class UserResponse(BaseModel):
         return str(value)
 
 
+class RegisterResponse(BaseModel):
+    needs_verification: bool
+    email: str
+
+
+class VerifyRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=255)
+    code: str = Field(..., min_length=6, max_length=6)
+
+
+class ResendRequest(BaseModel):
+    email: str = Field(..., min_length=5, max_length=255)
+
+
 class TokenResponse(BaseModel):
     access_token: str
     refresh_token: str

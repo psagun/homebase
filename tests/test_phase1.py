@@ -133,6 +133,8 @@ def test_record_view_requires_access(client, auth_client):
     client.post("/api/v1/auth/register", json={
         "email": "viewer@homebase.app", "password": "testpass123", "name": "Viewer",
     })
+    from tests.conftest import verify_email
+    verify_email("viewer@homebase.app")
     resp = client.post("/api/v1/auth/login", json={
         "email": "viewer@homebase.app", "password": "testpass123",
     })

@@ -11,6 +11,7 @@ from backend.models.property import Property
 from backend.models.property_tax import PropertyTax
 from backend.models.tenant import Tenant
 from backend.models.maintenance_record import MaintenanceRecord
+from backend.services import notification_service
 from backend.schemas.property_modules import (
     TaxCreate, TaxUpdate, TenantCreate, TenantUpdate,
     MaintenanceCreate, MaintenanceUpdate,
@@ -74,7 +75,9 @@ def create_tax(property_id: uuid.UUID, data: TaxCreate, cur=Depends(get_current_
     _get_prop(cur, property_id, db)
     _validate_portal_url(data.portal_url)
     t = PropertyTax(id=uuid.uuid4(), property_id=property_id, **_clean_values(PropertyTax, data.model_dump()))
-    db.add(t); db.commit(); db.refresh(t); return t
+    db.add(t); db.commit(); db.refresh(t)
+    notification_service.maybe_send(db, cur.id, "property", "Tax record added", "A tax record was added to your property.")
+    return t
 
 @router.patch("/properties/{property_id}/taxes/{tax_id}")
 def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: TaxUpdate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -86,6 +89,7 @@ def update_tax(property_id: uuid.UUID, tax_id: uuid.UUID, data: TaxUpdate, cur=D
     for k, v in _clean_values(PropertyTax, data.model_dump()).items():
         setattr(tax, k, v)
     db.commit(); db.refresh(tax)
+    notification_service.maybe_send(db, cur.id, "property", "Tax record updated", "A tax record on your property was updated.")
     return tax
 
 @router.delete("/properties/{property_id}/taxes/{tax_id}", status_code=204)
@@ -105,7 +109,9 @@ def list_tenants(property_id: uuid.UUID, cur=Depends(get_current_user), db: Sess
 def create_tenant(property_id: uuid.UUID, data: TenantCreate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
     t = Tenant(id=uuid.uuid4(), property_id=property_id, **_clean_values(Tenant, data.model_dump()))
-    db.add(t); db.commit(); db.refresh(t); return t
+    db.add(t); db.commit(); db.refresh(t)
+    notification_service.maybe_send(db, cur.id, "tenant", "Tenant added", "{name} was added as a tenant.".format(name=t.name))
+    return t
 
 @router.patch("/properties/{property_id}/tenants/{tenant_id}")
 def update_tenant(property_id: uuid.UUID, tenant_id: uuid.UUID, data: TenantUpdate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -118,6 +124,7 @@ def update_tenant(property_id: uuid.UUID, tenant_id: uuid.UUID, data: TenantUpda
     for k, v in _clean_values(Tenant, data.model_dump()).items():
         setattr(tenant, k, v)
     db.commit(); db.refresh(tenant)
+    notification_service.maybe_send(db, cur.id, "tenant", "Tenant updated", "Tenant {name} was updated.".format(name=tenant.name))
     return tenant
 
 @router.delete("/properties/{property_id}/tenants/{tenant_id}", status_code=204)
@@ -139,7 +146,9 @@ def list_maintenance(property_id: uuid.UUID, cur=Depends(get_current_user), db: 
 def create_maintenance(property_id: uuid.UUID, data: MaintenanceCreate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
     _get_prop(cur, property_id, db)
     m = MaintenanceRecord(id=uuid.uuid4(), property_id=property_id, **_clean_values(MaintenanceRecord, data.model_dump()))
-    db.add(m); db.commit(); db.refresh(m); return m
+    db.add(m); db.commit(); db.refresh(m)
+    notification_service.maybe_send(db, cur.id, "maintenance", "Maintenance record added", "Maintenance record {title} was added to your log.".format(title=m.title))
+    return m
 
 @router.patch("/properties/{property_id}/maintenance/{record_id}")
 def update_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, data: MaintenanceUpdate, cur=Depends(get_current_user), db: Session = Depends(get_db)):
@@ -152,6 +161,7 @@ def update_maintenance(property_id: uuid.UUID, record_id: uuid.UUID, data: Maint
     for k, v in _clean_values(MaintenanceRecord, data.model_dump()).items():
         setattr(rec, k, v)
     db.commit(); db.refresh(rec)
+    notification_service.maybe_send(db, cur.id, "maintenance", "Maintenance record updated", "Maintenance record {title} was updated in your log.".format(title=rec.title))
     return rec
 
 @router.delete("/properties/{property_id}/maintenance/{record_id}", status_code=204)

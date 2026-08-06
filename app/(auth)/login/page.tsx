@@ -2,10 +2,12 @@
 
 import { useState } from "react";
 import Link from "next/link";
+import { useRouter } from "next/navigation";
 import { useAuth } from "@/lib/auth/useAuth";
 import { getSupabase } from "@/lib/supabase/client";
 
 export default function LoginPage() {
+  const router = useRouter();
   const { login } = useAuth();
   const [email, setEmail] = useState("");
   const [password, setPassword] = useState("");
@@ -21,6 +23,13 @@ export default function LoginPage() {
     try {
       await login(email, password);
     } catch (err: unknown) {
+      const status = err && typeof err === "object" && "status" in err
+        ? (err as { status: number }).status
+        : null;
+      if (status === 403) {
+        router.push(`/verify?email=${encodeURIComponent(email)}`);
+        return;
+      }
       const message =
         err && typeof err === "object" && "message" in err
           ? (err as { message: string }).message

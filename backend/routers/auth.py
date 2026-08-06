@@ -1,7 +1,10 @@
 import bcrypt
+import hashlib
+import hmac
 import os
 import secrets
 import uuid
+from datetime import datetime, timedelta, timezone
 from fastapi import APIRouter, Depends, HTTPException, Request, Response, UploadFile, File, status
 from pydantic import BaseModel, Field
 from sqlalchemy.orm import Session
@@ -10,11 +13,14 @@ from backend.config import settings
 from backend.dependencies import get_current_user, get_db
 from backend.models.user import User
 from backend.ratelimit import rate_limit
-from backend.services import document_storage_service
+from backend.services import document_storage_service, email_service, notification_service
 from backend.schemas.auth import (
     LoginRequest,
     RefreshRequest,
     RegisterRequest,
+    RegisterResponse,
+    VerifyRequest,
+    ResendRequest,
     TokenResponse,
     UserResponse,
 )
@@ -34,6 +40,31 @@ class GoogleAuthRequest(BaseModel):
     access_token: str = Field(..., min_length=1)
 
 router = APIRouter()
+
+VERIFICATION_TTL_MINUTES = 15
+
+
+def _new_verification_code() -> str:
+    return f"{secrets.randbelow(1000000):06d}"
+
+
+def _code_hash(code: str) -> str:
+    return hashlib.sha256(code.encode()).hexdigest()
+
+
+def _start_verification(user: User, db: Session) -> str:
+    """Attach a fresh verification code and email it. Returns the code."""
+    code = _new_verification_code()
+    user.email_verified = False
+    user.verification_code_hash = _code_hash(code)
+    user.verification_expires_at = datetime.now(timezone.utc) + timedelta(minutes=VERIFICATION_TTL_MINUTES)
+    db.commit()
+    email_service.send_email(
+        user.email,
+        "Verify your HomeBase account",
+        f"Your verification code is {code}. It expires in 15 minutes.",
+    )
+    return code
 
 
 def get_auth_service(db: Session = Depends(get_db)) -> AuthService:
@@ -145,16 +176,23 @@ def _set_token_cookies(response: Response, data: dict) -> dict:
     return data
 
 
-@router.post("/register", response_model=TokenResponse)
+@router.post("/register", response_model=RegisterResponse)
 @rate_limit("10/minute")
 def register(
     request: Request,
     data: RegisterRequest,
     response: Response,
+    db: Session = Depends(get_db),
     auth: AuthService = Depends(get_auth_service),
 ):
-    result = auth.register(email=data.email, password=data.password, name=data.name)
-    return _set_token_cookies(response, result)
+    """Create an account, then require email verification before first login.
+
+    A 6-digit code is emailed (hashed + 15-minute expiry stored server-side);
+    the account cannot sign in until the code is entered on /auth/verify.
+    """
+    user = auth.register(email=data.email, password=data.password, name=data.name)
+    _start_verification(user, db)
+    return RegisterResponse(needs_verification=True, email=user.email)
 
 
 @router.post("/google", response_model=TokenResponse)
@@ -173,7 +211,7 @@ def google_auth(
     issues the app's own JWT cookies — the rest of the app is unchanged.
     New accounts get role "user", same as self-registration.
     """
-    from backend.services import document_storage_service
+    from backend.services import document_storage_service, email_service, notification_service
 
     client = document_storage_service.get_supabase_admin_client()
     if not client:
@@ -200,10 +238,16 @@ def google_auth(
             ).decode("utf-8"),
             name=metadata.get("full_name") or email.split("@")[0],
             role="user",
+            email_verified=True,  # Google already vouched for the address
         )
         db.add(user)
         db.commit()
         db.refresh(user)
+        notification_service.maybe_send(
+            db, user.id, "account",
+            "Welcome to HomeBase",
+            "Hi {name}.\n\nYour HomeBase account is ready. Sign in anytime at the app.".format(name=user.name),
+        )
 
     result = auth._generate_tokens(user)
     return _set_token_cookies(response, result)
@@ -215,9 +259,16 @@ def login(
     request: Request,
     data: LoginRequest,
     response: Response,
+    db: Session = Depends(get_db),
     auth: AuthService = Depends(get_auth_service),
 ):
     result = auth.login(email=data.email, password=data.password)
+    user = db.query(User).filter(User.email == data.email.strip().lower()).first()
+    if user and not user.email_verified:
+        raise HTTPException(
+            status_code=403,
+            detail="Please verify your email before signing in. Check your inbox for the code.",
+        )
     return _set_token_cookies(response, result)
 
 
@@ -251,6 +302,59 @@ def update_me(
     db.commit()
     db.refresh(current_user)
     return current_user
+
+
+@router.post("/verify", response_model=TokenResponse)
+@rate_limit("10/minute")
+def verify_email(
+    request: Request,
+    data: VerifyRequest,
+    response: Response,
+    db: Session = Depends(get_db),
+    auth: AuthService = Depends(get_auth_service),
+):
+    """Confirm an email with the emailed 6-digit code; then signs the user in."""
+    user = db.query(User).filter(User.email == data.email.strip().lower()).first()
+    if not user or user.email_verified or not user.verification_code_hash or not user.verification_expires_at:
+        raise HTTPException(status_code=400, detail="No verification pending for this email")
+
+    expires = user.verification_expires_at
+    if expires.tzinfo is None:  # SQLite returns naive datetimes
+        expires = expires.replace(tzinfo=timezone.utc)
+    if datetime.now(timezone.utc) > expires:
+        raise HTTPException(status_code=400, detail="Code expired — request a new one")
+
+    if not hmac.compare_digest(user.verification_code_hash, _code_hash(data.code)):
+        raise HTTPException(status_code=401, detail="Invalid code")
+
+    user.email_verified = True
+    user.verification_code_hash = None
+    user.verification_expires_at = None
+    db.commit()
+
+    notification_service.maybe_send(
+        db, user.id, "account",
+        "Welcome to HomeBase",
+        "Hi {name}.\n\nYour email is verified and your HomeBase account is ready.".format(name=user.name),
+    )
+
+    result = auth._generate_tokens(user)
+    return _set_token_cookies(response, result)
+
+
+@router.post("/resend-code")
+@rate_limit("3/hour")
+def resend_verification_code(
+    request: Request,
+    data: ResendRequest,
+    db: Session = Depends(get_db),
+):
+    """Send a fresh verification code (rotates the old one)."""
+    user = db.query(User).filter(User.email == data.email.strip().lower()).first()
+    if not user or user.email_verified:
+        raise HTTPException(status_code=400, detail="No verification pending for this email")
+    _start_verification(user, db)
+    return {"status": "ok"}
 
 
 @router.post("/logout")

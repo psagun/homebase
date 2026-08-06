@@ -2,11 +2,26 @@
 
 
 def test_register(client):
+    """Registration now requires email verification before login."""
     resp = client.post("/api/v1/auth/register", json={"email": "new@test.com", "password": "password123", "name": "New"})
     assert resp.status_code == 200
     data = resp.json()
-    assert "access_token" in data
-    assert data["user"]["email"] == "new@test.com"
+    assert data["needs_verification"] is True
+    assert data["email"] == "new@test.com"
+
+    # Unverified accounts cannot sign in
+    resp = client.post("/api/v1/auth/login", json={"email": "new@test.com", "password": "password123"})
+    assert resp.status_code == 403
+
+    # Wrong code is rejected; the right code signs in
+    resp = client.post("/api/v1/auth/verify", json={"email": "new@test.com", "code": "000000"})
+    assert resp.status_code == 401
+
+    from tests.conftest import verify_email
+    verify_email("new@test.com")
+    resp = client.post("/api/v1/auth/login", json={"email": "new@test.com", "password": "password123"})
+    assert resp.status_code == 200
+    assert "access_token" in resp.json()
 
 
 def test_register_duplicate(client):

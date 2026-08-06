@@ -15,6 +15,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
+from backend.services import notification_service
 from backend.models.user import User
 from backend.models.payment_history import PaymentHistory
 
@@ -198,6 +199,11 @@ def confirm_payment(
     )
     db.add(history)
     db.commit()
+    notification_service.maybe_send(
+        db, current_user.id, "payment",
+        "Payment confirmed",
+        "Your {ptype} payment for {due} was confirmed.".format(ptype=payment_type, due=due),
+    )
 
     return {
         "status": "ok",
@@ -360,6 +366,11 @@ def undo_payment(
 
     db.delete(record)
     db.commit()
+    notification_service.maybe_send(
+        db, current_user.id, "payment",
+        "Payment undone",
+        "Your {ptype} payment for {due} was undone.".format(ptype=record.payment_type, due=record.due_date),
+    )
 
     return {
         "status": "ok",

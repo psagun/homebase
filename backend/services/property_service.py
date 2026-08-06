@@ -7,6 +7,8 @@ from fastapi import HTTPException, status
 from sqlalchemy import or_
 from sqlalchemy.orm import Session
 
+from backend.services import notification_service
+
 from backend.models.property import Property, PropertyStatus, PropertyType
 from backend.models.property_investor import PropertyInvestor
 from backend.models.property_investor import PropertyInvestor
@@ -96,6 +98,11 @@ def create_property(db: Session, user_id, data) -> Property:
     db.add(prop)
     db.commit()
     db.refresh(prop)
+    notification_service.maybe_send(
+        db, user_id, "property",
+        "Property added",
+        "{name} was added to your portfolio.".format(name=prop.name),
+    )
     return prop
 
 
@@ -152,6 +159,11 @@ def update_property(db: Session, user_id, property_id, data) -> Property:
 
     db.commit()
     db.refresh(prop)
+    notification_service.maybe_send(
+        db, user_id, "property",
+        "Property updated",
+        "{name} was updated.".format(name=prop.name),
+    )
     return prop
 
 

@@ -6,6 +6,8 @@ from datetime import date
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from backend.services import notification_service
+
 from backend.models.mortgage import Mortgage
 from backend.models.property import Property
 from backend.models.task import Task, TaskPriority, TaskStatus, TaskType
@@ -85,6 +87,11 @@ def create_mortgage(db: Session, user_id, property_id, data) -> Mortgage:
     _sync_task_due_date(db, user_id, mortgage.property_id, mortgage.next_due_date)
     db.commit()
     db.refresh(mortgage)
+    notification_service.maybe_send(
+        db, user_id, "bill",
+        "Mortgage added",
+        "A mortgage with {lender} was added to your portfolio.".format(lender=data.lender_name),
+    )
     return mortgage
 
 
@@ -138,6 +145,11 @@ def update_mortgage(db: Session, user_id, mortgage_id, data) -> Mortgage:
     _sync_task_due_date(db, user_id, mortgage.property_id, mortgage.next_due_date)
     db.commit()
     db.refresh(mortgage)
+    notification_service.maybe_send(
+        db, user_id, "bill",
+        "Mortgage added",
+        "A mortgage with {lender} was added to your portfolio.".format(lender=data.lender_name),
+    )
     return mortgage
 
 

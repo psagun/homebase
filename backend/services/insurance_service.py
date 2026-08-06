@@ -6,6 +6,8 @@ from datetime import date
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from backend.services import notification_service
+
 from backend.models.insurance_policy import InsurancePolicy
 from backend.models.property import Property
 from backend.models.task import Task, TaskPriority, TaskStatus, TaskType
@@ -81,6 +83,11 @@ def create_policy(db: Session, user_id, property_id, data) -> InsurancePolicy:
     _sync_task_due_date(db, user_id, policy.property_id, policy.renewal_date)
     db.commit()
     db.refresh(policy)
+    notification_service.maybe_send(
+        db, user_id, "bill",
+        "Insurance policy added",
+        "A {provider} policy was added to your portfolio.".format(provider=data.provider_name),
+    )
     return policy
 
 
@@ -154,6 +161,11 @@ def update_policy(db: Session, user_id, policy_id, data) -> InsurancePolicy:
     _sync_task_due_date(db, user_id, policy.property_id, policy.renewal_date)
     db.commit()
     db.refresh(policy)
+    notification_service.maybe_send(
+        db, user_id, "bill",
+        "Insurance policy added",
+        "A {provider} policy was added to your portfolio.".format(provider=data.provider_name),
+    )
     return policy
 
 

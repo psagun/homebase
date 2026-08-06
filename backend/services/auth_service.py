@@ -49,7 +49,7 @@ class AuthService:
         self.db.commit()
         self.db.refresh(user)
 
-        return self._generate_tokens(user)
+        return user
 
     def login(self, email: str, password: str) -> dict:
         user = self.db.query(User).filter(User.email == email).first()

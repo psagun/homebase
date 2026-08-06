@@ -189,6 +189,8 @@ def test_undo_other_users_record_404(client, auth_client):
     client.post("/api/v1/auth/register", json={
         "email": "other@homebase.app", "password": "testpass123", "name": "Other User",
     })
+    from tests.conftest import verify_email
+    verify_email("other@homebase.app")
     resp = client.post("/api/v1/auth/login", json={
         "email": "other@homebase.app", "password": "testpass123",
     })

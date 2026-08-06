@@ -38,6 +38,20 @@ def client():
     app.dependency_overrides.clear()
 
 
+def verify_email(email: str) -> None:
+    """Mark an account verified in the test DB (bypasses the emailed code)."""
+    from backend.models.user import User
+
+    db = TestingSessionLocal()
+    user = db.query(User).filter(User.email == email).first()
+    if user:
+        user.email_verified = True
+        user.verification_code_hash = None
+        user.verification_expires_at = None
+        db.commit()
+    db.close()
+
+
 @pytest.fixture()
 def auth_client(client):
     """Register and login a test user, return client with auth headers.
@@ -51,6 +65,7 @@ def auth_client(client):
     client.post("/api/v1/auth/register", json={
         "email": "test@homebase.app", "password": "testpass123", "name": "Test User",
     })
+    verify_email("test@homebase.app")
     resp = client.post("/api/v1/auth/login", json={
         "email": "test@homebase.app", "password": "testpass123",
     })

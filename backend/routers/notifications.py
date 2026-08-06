@@ -7,6 +7,7 @@ from sqlalchemy import text
 from sqlalchemy.orm import Session
 
 from backend.dependencies import get_current_user, get_db
+from backend.services import notification_service
 from backend.models.insurance_policy import InsurancePolicy
 from backend.models.mortgage import Mortgage
 from backend.models.property import Property
@@ -58,6 +59,26 @@ def _load_property_names(db: Session, ids: list) -> dict:
         {f"p{i}": _hex(pid) for i, pid in enumerate(unique)},
     ).fetchall()
     return {_hex(r[0]): str(r[1]) for r in rows}
+
+
+@router.get("/prefs")
+def get_notification_prefs(
+    current_user: User = Depends(get_current_user),
+):
+    """Return the user's email-notification category prefs."""
+    return {"prefs": notification_service.get_prefs(current_user)}
+
+
+@router.put("/prefs")
+def update_notification_prefs(
+    prefs: dict,
+    current_user: User = Depends(get_current_user),
+    db: Session = Depends(get_db),
+):
+    """Persist per-category email-notification toggles."""
+    updated = notification_service.set_prefs(current_user, prefs)
+    db.commit()
+    return {"prefs": updated}
 
 
 @router.post("/read")

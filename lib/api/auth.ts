@@ -20,12 +20,25 @@ export function login(email: string, password: string): Promise<AuthResponse> {
   return api.post<AuthResponse>("/auth/login", { email, password });
 }
 
+export interface RegisterResult {
+  needs_verification: boolean;
+  email: string;
+}
+
 export function register(
   email: string,
   password: string,
   name: string
-): Promise<AuthResponse> {
-  return api.post<AuthResponse>("/auth/register", { email, password, name });
+): Promise<RegisterResult> {
+  return api.post<RegisterResult>("/auth/register", { email, password, name });
+}
+
+export function verifyEmail(email: string, code: string): Promise<AuthResponse> {
+  return api.post<AuthResponse>("/auth/verify", { email, code });
+}
+
+export function resendCode(email: string): Promise<{ status: string }> {
+  return api.post<{ status: string }>("/auth/resend-code", { email });
 }
 
 export function refreshToken(

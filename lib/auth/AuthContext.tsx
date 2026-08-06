@@ -53,9 +53,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const register = useCallback(
     async (email: string, password: string, name: string) => {
+      // Password registration always requires email verification first
       const result = await authApi.register(email, password, name);
-      setUser(result.user);
-      router.push("/dashboard");
+      router.push(`/verify?email=${encodeURIComponent(result.email)}`);
     },
     [router]
   );
